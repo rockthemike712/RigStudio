@@ -9,7 +9,12 @@ A code-driven character animation engine: **every frame is a pure function of `(
 - **Score**: events in musical time, `{ at: [bar, beat], pose | style | set | talk }`, compiled to keyframes with an overshoot ease, plus always-on secondary motion (breathing, blinking, 12fps line "boil", lip flap).
 
 ## Run it
-Open `rig-demo/index.html` in a browser. Edit the score on the left; changes apply live, and the line that's currently playing is highlighted. You can load a song to sync to and record a WebM.
+Open `rig-demo/index.html` in a browser. It has three parts:
+- **Stage** (middle): the character, animating.
+- **Control deck** (right): Character, Style and Pose tabs with live thumbnails, plus a Design tab of sliders for every rig parameter.
+  - **Paused:** clicks and slider moves are previews. Press "Add at bar X, beat Y" to write the preview into the script.
+  - **Playing:** every click is recorded into the script on the nearest half-beat, so you can perform along to a song ("Load song").
+- **Script** (left): the source of truth. It's editable, changes apply live, and the line currently playing is highlighted.
 
 ## Frame-exact export
 ```bash
