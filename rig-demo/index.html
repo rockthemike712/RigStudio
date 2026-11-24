@@ -318,7 +318,10 @@ const CHARACTERS = {
       ctx.restore();
     };
     ear(-1, P.earL); ear(1, P.earR);
-    const head = fluff(ellipse(0, -44, 126, 100, 60), 3.5, 14); pen.fill(head, 'fur'); pen.stroke(head);
+    // fox-like head: flatter crown, wide fluffy cheeks, tapering to a narrower chin
+    const R = [quad([0, -134], [56, -138], [88, -108]), quad([88, -108], [128, -76], [134, -26]), quad([134, -26], [130, 28], [60, 58]), quad([60, 58], [26, 72], [0, 72])];
+    const half = R.flatMap((q, i) => i ? q.slice(1) : q), headPts = half.concat(half.slice(1, -1).reverse().map(([x, y]) => [-x, y]));
+    const head = fluff(headPts, 3, 16); pen.fill(head, 'fur'); pen.stroke(head);
     // white mask: muzzle + lower cheeks, with the thin blaze running up the forehead
     const mask = quad([-74, 8], [-60, 72], [0, 70]).concat(quad([0, 70], [60, 72], [74, 8])).concat(quad([74, 8], [40, -26], [0, -18])).concat(quad([0, -18], [-40, -26], [-74, 8]));
     pen.fill(mask, 'white'); pen.stroke(mask, true, .65);
