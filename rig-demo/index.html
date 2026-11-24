@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rig Engine</title>
+<style>
+  :root { --bg:#0f1013; --panel:#16171b; --line:#2a2c33; --text:#d7d8dc; --dim:#80838c; --hl:rgba(255,196,0,.22); }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font:13px/1.4 ui-sans-serif, system-ui, sans-serif; }
+  #app { display:grid; grid-template-columns: minmax(320px, 38%) 1fr; height:100%; }
+  #left { display:flex; flex-direction:column; border-right:1px solid var(--line); min-width:0; }
+  .bar { display:flex; gap:6px; align-items:center; padding:8px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
+  .bar label { color:var(--dim); }
+  button, input[type=number] { background:#23252b; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 10px; font:inherit; }
+  button:hover { background:#2d3038; cursor:pointer; }
+  button.rec { color:#ff6b6b; }
+  input[type=number] { width:64px; }
+  #editorWrap { position:relative; flex:1; overflow:hidden; }
+  #hl { position:absolute; left:0; right:0; height:18px; background:var(--hl); border-left:3px solid #ffc400; pointer-events:none; transition:top .06s; }
+  #code { position:absolute; inset:0; width:100%; height:100%; resize:none; border:0; outline:0; background:transparent; color:#e6e6e6;
+          font:12.5px/18px ui-monospace, SFMono-Regular, Menlo, monospace; padding:10px 12px; white-space:pre; tab-size:2; }
+  #err { color:#ff7b7b; padding:6px 10px; font-family:ui-monospace, monospace; font-size:12px; min-height:26px; border-top:1px solid var(--line); }
+  #right { display:flex; flex-direction:column; min-width:0; }
+  #stage { flex:1; display:flex; align-items:center; justify-content:center; padding:12px; min-height:0; }
+  canvas { max-width:100%; max-height:100%; aspect-ratio:16/9; border-radius:8px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+  #scrub { flex:1; min-width:120px; }
+  #clock { font-family:ui-monospace, monospace; color:var(--dim); min-width:120px; }
+  @media (max-width: 800px) { #app { grid-template-columns:1fr; grid-template-rows: 55% 45%; } #left { order:2; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="left">
+    <div class="bar">
+      <label>BPM</label><input id="bpm" type="number" value="100" min="30" max="240">
+      <label>Beats/bar</label><input id="bpb" type="number" value="4" min="1" max="12">
+      <span style="color:var(--dim)">edits apply live · one event per line</span>
+    </div>
+    <div id="editorWrap"><div id="hl"></div><textarea id="code" spellcheck="false"></textarea></div>
+    <div id="err"></div>
+  </div>
+  <div id="right">
+    <div id="stage"><canvas id="cv" width="1920" height="1080"></canvas></div>
+    <div class="bar">
+      <button id="play">Pause</button>
+      <button id="restart">⟲</button>
+      <input id="scrub" type="range" min="0" max="1000" value="0">
+      <span id="clock">0.00s</span>
+      <label class="btn"><input id="audioFile" type="file" accept="audio/*" hidden><button onclick="audioFile.click()">Load song</button></label>
+      <button id="rec" class="rec">● Record WebM</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   RIG ENGINE
+   Everything is a pure function of time:  frame = render(score, t)
+   - CHARACTER: a parametric rig (numbers only, so anything can tween)
+   - POSES:     named partial parameter sets
+   - STYLES:    renderers that draw the same rig geometry differently
+   - SCORE:     musical-time events { at:[bar, beat], ... } compiled to keyframes
+   ===================================================================== */
+
+const BASE = {
+  bx:0, by:0, tilt:0, squash:1, zoom:1, camX:0, bounce:0,
+  eyeOpen:1, eyeSize:20, eyeGap:48, lookX:0, lookY:0,
+  browY:-78, browInner:0, browTilt:0, browW:1,
+  mouthW:30, mouthCurve:8, mouthOpen:0, mouthY:18,
+  lhX:-160, lhY:70, lhR:0, rhX:160, rhY:70, rhR:0, wave:0,
+};
+
+const POSES = {
+  neutral:   {},
+  smiling:   { mouthCurve:16, mouthW:36, eyeOpen:.85, browY:-82 },
+  waving:    { mouthCurve:14, rhX:175, rhY:-70, rhR:-20, wave:1, tilt:-3 },
+  thinking:  { lookX:9, lookY:-7, browTilt:10, mouthCurve:-2, mouthW:18, rhX:55, rhY:95, rhR:-35, tilt:4 },
+  laughing:  { eyeOpen:.18, mouthOpen:26, mouthCurve:16, mouthW:40, browY:-90, bounce:10, lhY:40, rhY:40 },
+  suspicious:{ eyeOpen:.38, lookX:-10, browInner:10, browTilt:-6, mouthCurve:-4, mouthW:20, tilt:-5, bx:-15 },
+  furious:   { eyeOpen:.7, eyeSize:17, browInner:22, browY:-70, mouthCurve:-12, mouthOpen:8, squash:.94, lhY:110, rhY:110, lhR:20, rhR:-20 },
+  surprised: { eyeOpen:1.35, eyeSize:23, browY:-102, mouthOpen:22, mouthW:16, mouthCurve:0, squash:1.06, lhX:-175, lhY:-10, rhX:175, rhY:-10 },
+  sad:       { lookY:6, browInner:-14, browY:-74, mouthCurve:-14, mouthW:24, squash:.96, lhY:120, rhY:120 },
+  sleepy:    { eyeOpen:.12, browY:-72, mouthCurve:2, mouthW:14, tilt:8, squash:.97, lhY:120, rhY:120 },
+};
+
+const STYLES = {
+  pencil:    { bg:'#efede6', ink:'rgba(38,38,44,.82)', w:2.3, jitter:2.4, passes:2, guides:'rgba(70,115,205,.32)', shadow:'rgba(0,0,0,.10)',
+               fills:{ dark:'rgba(38,38,44,.85)', eyeWhite:'#efede6' } },
+  blueprint: { bg:'#eef0ef', ink:'rgba(52,128,214,.9)', w:2, jitter:1.8, passes:3, guides:'rgba(52,128,214,.32)', shadow:'rgba(0,0,0,.10)',
+               fills:{ dark:'rgba(52,128,214,.9)', eyeWhite:'#eef0ef' } },
+  ink:       { bg:'#fbfaf7', ink:'#141414', w:7, jitter:0, passes:1, shadow:'rgba(0,0,0,.16)',
+               fills:{ body:'#ffffff', side:'#e9e7e1', dark:'#141414', eyeWhite:'#ffffff', hand:'#ffffff' } },
+  hologram:  { bg:'#05060b', ink:'#ff4fd8', w:3, jitter:.5, passes:1, glow:28, holo:true,
+               fills:{ dark:'INK', eyeWhite:'#05060b' } },
+  paint:     { bg:'#f4efe4', ink:'#2b2118', w:4, jitter:1.1, passes:1, shadow:'rgba(60,40,20,.2)',
+               fills:{ body:'PAINT', side:'rgba(60,90,60,.55)', dark:'#2b2118', eyeWhite:'#fff8ea', hand:'#e8a93a' } },
+};
+
+const DEFAULT_SCORE = `[
+  // bar 1 — the engine reads this like sheet music
+  { at: [1, 1], style: 'pencil', pose: 'neutral' },
+  { at: [1, 3], pose: 'waving' },
+  { at: [2, 1], pose: 'smiling', talk: 2 },
+  { at: [2, 3], set: { lookX: 9, lookY: -5 } },
+  // bar 3
+  { at: [3, 1], pose: 'thinking' },
+  { at: [3, 3], style: 'blueprint' },
+  { at: [4, 1], pose: 'laughing' },
+  { at: [4, 3], style: 'ink' },
+  // bar 5
+  { at: [5, 1], pose: 'suspicious' },
+  { at: [5, 3], pose: 'furious' },
+  { at: [6, 1], style: 'hologram', color: '#ff4fd8', pose: 'surprised' },
+  { at: [6, 3], style: 'hologram', color: '#39f3ff' },
+  { at: [6, 4], style: 'hologram', color: '#ffd23a' },
+  // bar 7
+  { at: [7, 1], style: 'paint', pose: 'smiling', talk: 4 },
+  { at: [8, 1], pose: 'sad' },
+  { at: [8, 3], set: { eyeOpen: 0.5, browInner: -20 } },
+  { at: [9, 1], style: 'pencil', pose: 'sleepy' },
+]`;
+
+/* ---------- geometry helpers (everything becomes polylines) ---------- */
+const TAU = Math.PI * 2;
+const rnd = (a, b) => { const x = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453; return x - Math.floor(x); };
+function ellipse(cx, cy, rx, ry, n = 40) { const p = []; for (let i = 0; i < n; i++) { const a = i / n * TAU; p.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]); } return p; }
+function rrect(x, y, w, h, r) {
+  const p = [], c = [[x + w - r, y + r, -.25], [x + w - r, y + h - r, 0], [x + r, y + h - r, .25], [x + r, y + r, .5]];
+  for (const [cx, cy, s] of c) for (let i = 0; i <= 8; i++) { const a = (s + i / 32) * TAU; p.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+  return p;
+}
+function quad(p0, c, p1, n = 18) { const p = []; for (let i = 0; i <= n; i++) { const t = i / n, u = 1 - t; p.push([u*u*p0[0] + 2*u*t*c[0] + t*t*p1[0], u*u*p0[1] + 2*u*t*c[1] + t*t*p1[1]]); } return p; }
+
+/* ---------- the "pen": one drawing API, many styles ---------- */
+function makePen(ctx, S, seed, t) {
+  const ink = S.color || S.ink;
+  function path(pts, closed, pass) {
+    ctx.beginPath();
+    pts.forEach(([x, y], i) => {
+      const j = S.jitter;
+      const ox = j ? Math.sin(i * .37 + seed * 1.7 + pass * 2.3) * j + (rnd(i, seed + pass * 31) - .5) * j * .7 : 0;
+      const oy = j ? Math.cos(i * .29 + seed * 1.3 + pass * 1.9) * j + (rnd(i + 99, seed + pass * 17) - .5) * j * .7 : 0;
+      i ? ctx.lineTo(x + ox, y + oy) : ctx.moveTo(x + ox, y + oy);
+    });
+    if (closed) ctx.closePath();
+  }
+  return {
+    stroke(pts, closed = true, k = 1, color) {
+      ctx.save();
+      ctx.strokeStyle = color || ink; ctx.lineWidth = S.w * k; ctx.lineJoin = ctx.lineCap = 'round';
+      if (S.glow) { ctx.shadowColor = ink; ctx.shadowBlur = S.glow; }
+      for (let p = 0; p < S.passes; p++) { path(pts, closed, p); ctx.stroke(); }
+      ctx.restore();
+    },
+    guide(pts, closed = false) { if (!S.guides) return; ctx.save(); ctx.strokeStyle = S.guides; ctx.lineWidth = 1.4; path(pts, closed, 7); ctx.stroke(); ctx.restore(); },
+    fill(pts, role) {
+      let c = S.fills && S.fills[role]; if (!c) return;
+      ctx.save(); path(pts, true, 0);
+      if (c === 'INK') c = ink;
+      if (c === 'PAINT') { // watercolour: clip, then lay blotches
+        ctx.clip(); const cols = ['#3d7bc7', '#4f9a4a', '#2f6fb0', '#79b04a', '#c9a227'];
+        for (let i = 0; i < 14; i++) { const x = -110 + rnd(i, 3) * 230, y = -130 + rnd(i, 5) * 270, r = 60 + rnd(i, 7) * 90;
+          const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, cols[i % 5] + 'cc'); g.addColorStop(1, cols[i % 5] + '00');
+          ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+      } else { ctx.fillStyle = c; ctx.fill(); }
+      ctx.restore();
+    },
+  };
+}
+
+/* ---------- draw the rig ---------- */
+function drawCharacter(ctx, P, S, t) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const seed = Math.floor(t * 12);               // "boil": redraw jitter 12×/sec like hand animation
+  const pen = makePen(ctx, S, seed, t);
+  ctx.fillStyle = S.bg; ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(W / 2 + P.camX, H / 2 - 20); ctx.scale(P.zoom * 1.9, P.zoom * 1.9);
+
+  // ground shadow / hologram pad
+  if (S.holo) { for (let i = 0; i < 3; i++) pen.stroke(ellipse(0, 215 + i * 6, 120 - i * 25, 22 - i * 4), true, .7); }
+  else { ctx.fillStyle = S.shadow; ctx.beginPath(); ctx.ellipse(0, 205, 150 * (2 - P.squash) * .9, 16, 0, 0, TAU); ctx.fill(); }
+
+  const breathe = Math.sin(t * 2.2);
+  const bounce = -Math.abs(Math.sin(t * 9)) * P.bounce;
+  ctx.translate(P.bx, P.by + breathe * 3 + bounce + (S.holo ? Math.sin(t * 1.6) * 8 - 15 : 0));
+  ctx.rotate(P.tilt * Math.PI / 180);
+
+  // body (squash/stretch anchored at the feet)
+  const sq = P.squash + breathe * .012;
+  ctx.save(); ctx.translate(0, 135); ctx.scale(1 / Math.sqrt(sq), sq); ctx.translate(0, -135);
+  const back = rrect(-83, -147, 210, 262, 32), front = rrect(-108, -125, 210, 262, 32);
+  const side = [[102 - 8, -125 + 6], [127 - 6, -147 + 8], [127, 115 - 10], [102, 137 - 10]];
+  pen.fill(back, 'side'); pen.stroke(back, true, .8);
+  pen.fill(front, 'body');
+  if (S.holo) { ctx.save(); ctx.beginPath(); front.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.clip();
+    for (let y = -125; y < 140; y += 16) pen.stroke([[-110, y], [110, y]], false, .25); for (let x = -100; x < 110; x += 24) pen.stroke([[x, -130], [x, 140]], false, .25); ctx.restore(); }
+  pen.stroke(front);
+  pen.stroke([[-76, -125], [-51, -147]], false, .8); pen.stroke([[102 - 6, 137 - 3], [127 - 4, 115 - 4]], false, .8);
+  pen.stroke([[-108, 0], [102, 0]], false, .55);     // the "fridge door" seam
+  pen.guide([[0, -175], [0, 175]]); pen.guide([[-140, -40], [140, -40]]); pen.guide(ellipse(0, -10, 150, 170, 48), true);
+
+  // eyes
+  const ey = -40;
+  for (const side of [-1, 1]) {
+    const ex = side * P.eyeGap - 3, rx = P.eyeSize, ry = Math.max(1, P.eyeSize * .62 * P.eyeOpen);
+    if (P.eyeOpen < .16) { pen.stroke(quad([ex - rx, ey], [ex, ey + 6], [ex + rx, ey]), false, 1.3); continue; }
+    const eye = ellipse(ex, ey, rx, ry, 32);
+    pen.fill(eye, 'eyeWhite'); pen.stroke(eye, true, 1.1);
+    ctx.save(); ctx.beginPath(); ctx.ellipse(ex, ey, rx, ry, 0, 0, TAU); ctx.clip();
+    pen.fill(ellipse(ex + P.lookX, ey + P.lookY, rx * .42, rx * .42, 20), 'dark'); ctx.restore();
+    // brows
+    const inner = ex - side * rx * .6, outer = ex + side * rx * 1.15;
+    const iy = P.browY + P.browInner + side * P.browTilt * .5, oy = P.browY - P.browInner * .35 - side * P.browTilt * .5;
+    pen.stroke(quad([inner, iy], [(inner + outer) / 2, Math.min(iy, oy) - 6], [outer, oy]), false, 2.1 * P.browW);
+  }
+  // mouth
+  const my = P.mouthY, mw = P.mouthW, up = quad([-mw - 3, my], [-3, my + P.mouthCurve], [mw - 3, my]);
+  if (P.mouthOpen > 1.5) {
+    const lo = quad([-mw - 3, my], [-3, my + P.mouthCurve + P.mouthOpen * 2], [mw - 3, my]);
+    const shape = up.concat(lo.slice().reverse()); pen.fill(shape, 'dark'); pen.stroke(shape, true, 1.1);
+  } else pen.stroke(up, false, 1.3);
+  ctx.restore();
+
+  // hands (not squashed with the body)
+  const hand = (x, y, r, flip, wave) => {
+    ctx.save(); ctx.translate(x, y); ctx.rotate((r + wave * Math.sin(t * 13) * 22) * Math.PI / 180); ctx.scale(flip, 1);
+    const palm = rrect(-22, -30, 44, 58, 18), thumb = ellipse(-24, 2, 10, 15, 18);
+    pen.fill(thumb, 'hand'); pen.stroke(thumb, true, .9); pen.fill(palm, 'hand'); pen.stroke(palm, true, .9);
+    pen.stroke([[-8, -28], [-8, -8]], false, .6); pen.stroke([[6, -28], [6, -8]], false, .6);
+    ctx.restore();
+  };
+  hand(P.lhX, P.lhY, P.lhR, 1, 0); hand(P.rhX, P.rhY, P.rhR, -1, P.wave);
+  ctx.restore();
+
+  if (S.holo) { ctx.fillStyle = 'rgba(255,255,255,.035)'; for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 1); }
+}
+
+/* ---------- score → keyframes ---------- */
+const ease = x => { const c1 = 1.70158, c3 = c1 + 1; return x >= 1 ? 1 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); }; // overshoot = cartoon snap
+function compile(score, bpm, bpb) {
+  const spb = 60 / bpm, beatTime = ([bar, beat]) => ((bar - 1) * bpb + (beat - 1)) * spb;
+  const ev = score.map((e, idx) => ({ ...e, idx, t: beatTime(e.at) })).sort((a, b) => a.t - b.t || a.idx - b.idx);
+  let pose = 'neutral', set = {}, style = 'pencil', color = null;
+  const keys = [{ t: 0, params: { ...BASE }, style, color, idx: -1 }], talks = [];
+  for (const e of ev) {
+    if (e.pose) { if (!POSES[e.pose]) throw new Error(`unknown pose '${e.pose}' — try: ${Object.keys(POSES).join(', ')}`); pose = e.pose; set = {}; }
+    if (e.set) set = { ...set, ...e.set };
+    if (e.style) { if (!STYLES[e.style]) throw new Error(`unknown style '${e.style}' — try: ${Object.keys(STYLES).join(', ')}`); style = e.style; color = e.color || null; }
+    if (e.talk) talks.push([e.t, e.t + e.talk * spb]);
+    keys.push({ t: e.t, params: { ...BASE, ...POSES[pose], ...set }, style, color, idx: e.idx });
+  }
+  const duration = (ev.length ? ev[ev.length - 1].t : 0) + bpb * spb * 1.5;
+  return { keys, talks, duration };
+}
+function evaluate(C, t) {
+  let i = 0; while (i + 1 < C.keys.length && C.keys[i + 1].t <= t) i++;
+  const a = C.keys[Math.max(0, i - 1)], b = C.keys[i], k = ease(Math.min(1, (t - b.t) / .24));
+  const P = {}; for (const key in BASE) P[key] = a.params[key] + (b.params[key] - a.params[key]) * k;
+  // secondary motion that's always on: blinking + lip flap while talking
+  const bp = t % 3.4; if (bp < .14) P.eyeOpen *= Math.abs(bp / .07 - 1);
+  for (const [s, e] of C.talks) if (t >= s && t < e) { P.mouthOpen += Math.abs(Math.sin(t * 17)) * 14; P.mouthW *= .85; }
+  return { P, S: { ...STYLES[b.style], color: b.color }, idx: b.idx };
+}
+
+/* ---------- app shell: editor, transport, recording ---------- */
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const code = document.getElementById('code'), hl = document.getElementById('hl'), err = document.getElementById('err');
+const bpmEl = document.getElementById('bpm'), bpbEl = document.getElementById('bpb'), scrub = document.getElementById('scrub'), clock = document.getElementById('clock');
+const audio = new Audio();
+let C = compile([], 100, 4), lineOf = [], playing = true, t0 = performance.now() / 1000, tPaused = 0, hasAudio = false;
+
+function rebuild() {
+  try {
+    const score = new Function(`return (${code.value});`)();
+    C = compile(score, +bpmEl.value, +bpbEl.value);
+    lineOf = []; code.value.split('\n').forEach((l, n) => { if (/\bat\s*:/.test(l) && !/^\s*\/\//.test(l)) lineOf.push(n); });
+    err.textContent = '';
+  } catch (e) { err.textContent = e.message; }
+}
+const now = () => hasAudio ? audio.currentTime : playing ? performance.now() / 1000 - t0 : tPaused;
+function seek(t) { if (hasAudio) audio.currentTime = t; t0 = performance.now() / 1000 - t; tPaused = t; }
+function renderAt(t) { const { P, S, idx } = evaluate(C, t); drawCharacter(ctx, P, S, t); return idx; }
+
+function frame() {
+  let t = now(); if (t > C.duration && !recorder) { seek(0); t = 0; }
+  const idx = renderAt(t);
+  const line = lineOf[idx]; hl.style.display = line == null ? 'none' : 'block';
+  hl.style.top = (10 + line * 18 - code.scrollTop) + 'px';
+  scrub.value = Math.round(t / C.duration * 1000); clock.textContent = `${t.toFixed(2)}s / ${C.duration.toFixed(1)}s`;
+  requestAnimationFrame(frame);
+}
+
+document.getElementById('play').onclick = e => {
+  playing = !playing; e.target.textContent = playing ? 'Pause' : 'Play';
+  if (playing) { seek(tPaused); hasAudio && audio.play(); } else { tPaused = now(); hasAudio && audio.pause(); }
+};
+document.getElementById('restart').onclick = () => seek(0);
+scrub.oninput = () => seek(scrub.value / 1000 * C.duration);
+code.oninput = bpmEl.oninput = bpbEl.oninput = rebuild;
+document.getElementById('audioFile').onchange = e => { const f = e.target.files[0]; if (!f) return; audio.src = URL.createObjectURL(f); hasAudio = true; seek(0); audio.play(); };
+
+let recorder = null;
+document.getElementById('rec').onclick = async e => {
+  if (recorder) return;
+  const stream = cv.captureStream(60);
+  if (hasAudio) { const ac = new AudioContext(), src = ac.createMediaElementSource(audio), dst = ac.createMediaStreamDestination(); src.connect(dst); src.connect(ac.destination); dst.stream.getAudioTracks().forEach(tr => stream.addTrack(tr)); }
+  const chunks = []; recorder = new MediaRecorder(stream, { mimeType: 'video/webm', videoBitsPerSecond: 12e6 });
+  recorder.ondataavailable = d => chunks.push(d.data);
+  recorder.onstop = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' })); a.download = 'rig.webm'; a.click(); recorder = null; e.target.textContent = '● Record WebM'; };
+  seek(0); if (!playing) document.getElementById('play').click(); hasAudio && audio.play();
+  recorder.start(); e.target.textContent = 'recording…';
+  setTimeout(() => recorder.stop(), C.duration * 1000);
+};
+
+code.value = DEFAULT_SCORE; rebuild(); requestAnimationFrame(frame);
+
+// hook for the offline renderer (render.cjs): deterministic frame-by-frame export
+window.RIG = { renderAt: t => { playing = false; renderAt(t); }, duration: () => C.duration, canvas: cv };
+</script>
+</body>
+</html>
