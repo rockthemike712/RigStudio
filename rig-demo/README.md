@@ -25,4 +25,10 @@ This steps time frame by frame in headless Chromium and pipes the frames to ffmp
 ## Extending
 - New expression: add an entry to `POSES`.
 - New look: add an entry to `STYLES` (colours, line weight, jitter, passes, glow, fills).
-- New character: add a function to `CHARACTERS` that draws with `pen.fill` and `pen.stroke` and reads the shared params. `drawEyes` is reusable.
+- **New character from art (recommended)**: an SVG rig. You can load it with "Import SVG character…" in the Character tab, or embed it like `characters/hashbrown.svg`. The format:
+  - `viewBox="0 0 1000 1000"`.
+  - One `<g id="…" data-pivot="x,y">` per part: `tail`, `body`, `leg-back`, `leg-front-left`, `leg-front-right`, `chest-ruff`, `head`, `ear-left`, `ear-right`, `nose`.
+  - Swappable face groups: `eyes-open|happy|closed|wide`, `brows-neutral|angry|worried`, `mouth-smile|grin|flat|frown|o`.
+  - Plain `<path>`s only, filled by class (`fur`, `white`, `pink`, `dark`). Unfilled paths are linework.
+  The loader samples each path into points, so every style (pencil boil, hologram glow, paint) still applies to the art.
+- New character in code: add a function to `CHARACTERS` that draws with `pen.fill` and `pen.stroke` and reads the shared params. `drawEyes` is reusable.

@@ -51,6 +51,7 @@
   .tile span { padding:5px 8px; font-size:12px; color:var(--dim); }
   .tile[aria-pressed=true] { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
   .tile[aria-pressed=true] span { color:var(--text); }
+  .tile.import { justify-content:center; align-items:center; min-height:96px; border-style:dashed; }
   fieldset { border:0; padding:0; margin:0 0 14px; display:grid; gap:6px; }
   legend { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
   .sl { display:grid; grid-template-columns:96px minmax(0, 1fr) 44px; align-items:center; gap:8px; font-size:12px; }
@@ -85,6 +86,7 @@
     <label class="lbl" for="bpb">Beats/bar</label><input id="bpb" type="number" value="4" min="1" max="12">
     <input id="audioFile" type="file" accept="audio/*" hidden>
     <button id="loadSong">Load song</button>
+    <input id="svgFile" type="file" accept=".svg,image/svg+xml" hidden>
   </header>
   <main>
     <section class="pane" id="scriptPane">
@@ -296,97 +298,208 @@ const CHARACTERS = {
     };
     hand(P.lhX, P.lhY, P.lhR, 1, 0); hand(P.rhX, P.rhY, P.rhR, -1, P.wave);
   },
-
-  // Hashbrown: modelled on the owner's ink drawing — 3/4 standing pose, body trailing to the right
-  hashbrown(ctx, pen, P, S, t, sq) {
-    const tick = (x, y, a, l, k = .42) => pen.stroke([[x, y], [x + Math.cos(a) * l, y + Math.sin(a) * l]], false, k);
-    const furEdge = (pts, every, len, from = 0, to = 1) => {     // little fur flicks along an outline
-      const n = pts.length, cx = pts.reduce((a, p) => a + p[0], 0) / n, cy = pts.reduce((a, p) => a + p[1], 0) / n;
-      for (let i = Math.floor(n * from); i < n * to; i += every) { const [x, y] = pts[i], a = Math.atan2(y - cy, x - cx);
-        tick(x - Math.cos(a) * len * 1.2, y - Math.sin(a) * len * 1.2, a + .5, len); }
-    };
-    ctx.save(); ctx.translate(-12, 0); ctx.translate(0, 190); ctx.scale(.86, .86); ctx.translate(0, -190); squashAt(ctx, 190, sq);
-
-    // curled fluffy tail sitting on top of the back
-    ctx.save(); ctx.translate(112, -18); ctx.rotate(Math.sin(t * 15) * 20 * P.tailWag * Math.PI / 180);
-    const tail = fluff(ellipse(18, -24, 30, 26, 30), 4, 10); pen.fill(tail, 'fur'); pen.stroke(tail, true, .9);
-    pen.stroke(quad([2, -18], [10, -44], [30, -36]), false, .5); ctx.restore();
-    // hind body + fluffy butt, and the one visible back leg
-    const hind = fluff(ellipse(62, 62, 108, 98, 60), 3.5, 18); pen.fill(hind, 'fur'); pen.stroke(hind); furEdge(hind, 4, 9, .0, .5);
-    const hl = rrect(112, 100, 42, 82, 18); pen.fill(hl, 'fur'); pen.stroke(hl, true, .9);
-    const hp = ellipse(136, 182, 26, 13, 22); pen.fill(hp, 'white'); pen.stroke(hp, true, .9);
-    pen.stroke([[128, 176], [128, 190]], false, .5); pen.stroke([[140, 176], [140, 190]], false, .5);
-
-    // front legs (driven by the rig's hand channels, so poses can lift a paw)
-    const leg = (bx, hx, hy, r, wave) => {
-      const x = bx + (hx - Math.sign(hx) * 160) * .2, y = (hy - 70) * .75, raised = hy < 40;
-      ctx.save(); ctx.translate(x, 140 + y); ctx.rotate((r * .6 + wave * Math.sin(t * 13) * 22) * Math.PI / 180);
-      const l = rrect(-20, -30, 40, 72, 16); pen.fill(l, 'white'); pen.stroke(l, true, .9);
-      const p = ellipse(-4, 46, 28, 14, 22); pen.fill(p, 'white'); pen.stroke(p, true, .9);
-      if (raised) { pen.fill(ellipse(-4, 46, 10, 7, 16), 'pink'); for (const bx2 of [-16, -4, 8]) pen.fill(ellipse(bx2, 38, 4.5, 4, 12), 'pink'); }
-      else for (const tx of [-14, -4, 6]) pen.stroke(quad([tx, 40], [tx + 1, 50], [tx, 58]), false, .55);
-      ctx.restore();
-    };
-    leg(-88, P.lhX, P.lhY, P.lhR, 0); leg(24, P.rhX, P.rhY, P.rhR, P.wave);
-
-    // big V-shaped chest ruff
-    const ruff = fluff(quad([-138, -30], [-156, 96], [-32, 168]).concat(quad([-32, 168], [84, 96], [80, -30])).concat(quad([80, -30], [-30, -58], [-138, -30])), 6, 26);
-    pen.fill(ruff, 'white'); pen.stroke(ruff, true, .85);
-    for (let i = 0; i < 26; i++) { const x = -120 + rnd(i, 11) * 180, y = 10 + rnd(i, 12) * 130; if (Math.abs(x + 30) < 130 - (y - 10) * .7) tick(x, y, Math.PI / 2 + (x + 30) * .006 + (rnd(i, 13) - .5) * .6, 12 + rnd(i, 14) * 8); }
-    pen.guide([[-30, -260], [-30, 200]]); pen.guide([[-170, -95], [130, -95]]);
-
-    // head
-    ctx.save(); ctx.translate(-30, -88 + Math.sin(t * 2.2 + 1) * 2);
-    const ear = (side, rot) => {   // tall, wide-based, rounded tips
-      ctx.save(); ctx.translate(side * 60, -72); ctx.rotate((rot + side * 4) * Math.PI / 180); ctx.scale(-side, 1);
-      const outer = quad([-36, 30], [-64, -60], [-44, -122]).concat(quad([-44, -122], [-28, -158], [-6, -120])).concat(quad([-8, -126], [20, -60], [34, -6]));
-      const inner = quad([-22, 12], [-46, -52], [-32, -112]).concat(quad([-32, -112], [-24, -124], [-14, -110])).concat(quad([-14, -110], [8, -56], [16, -4]));
-      pen.fill(outer, 'fur'); pen.stroke(outer, true); pen.fill(inner, 'pink'); pen.stroke(inner, true, .5);
-      for (const [x, y] of [[-24, -20], [-14, -46], [-30, -66]]) tick(x, y, -1.3, 14, .4);
-      ctx.restore();
-    };
-    ear(-1, P.earL); ear(1, P.earR);
-    const HR = [quad([0, -100], [40, -104], [64, -92]), quad([64, -92], [92, -64], [100, -20]), quad([100, -20], [116, 30], [96, 62]), quad([96, 62], [56, 92], [0, 92])];
-    const half = HR.flatMap((q, i) => i ? q.slice(1) : q), head = fluff(half.concat(half.slice(1, -1).reverse().map(([x, y]) => [-x, y])), 3, 18);
-    pen.fill(head, 'fur'); pen.stroke(head); furEdge(head, 3, 8, .3, .7);
-    // white mask: narrow blaze widening into the muzzle and lower cheeks
-    const mask = quad([-6, -98], [-10, -40], [-26, -4]).concat(quad([-26, -4], [-74, 30], [-70, 62])).concat(quad([-70, 62], [0, 100], [70, 62]))
-      .concat(quad([70, 62], [74, 30], [26, -4])).concat(quad([26, -4], [10, -40], [6, -98]));
-    pen.fill(mask, 'white'); pen.stroke(quad([-6, -98], [-10, -40], [-26, -4]), false, .6); pen.stroke(quad([26, -4], [10, -40], [6, -98]), false, .6);
-    pen.stroke(quad([-26, -4], [-40, 14], [-34, 30]), false, .5); pen.stroke(quad([26, -4], [40, 14], [34, 30]), false, .5);   // muzzle sides
-
-    // eyes: small, dark and round with a shine; smile crinkles when happy
-    for (const side of [-1, 1]) {
-      const ex = side * (P.eyeGap - 4) + P.lookX * .6, ey = -24 + P.lookY * .5, rx = P.eyeSize * .55, ry = rx * Math.min(1.25, P.eyeOpen);
-      if (P.eyeOpen < .2) pen.stroke(quad([ex - rx * 1.3, ey], [ex, ey + 7], [ex + rx * 1.3, ey]), false, 1.2);
-      else { const e = ellipse(ex, ey, rx, ry, 24); pen.fill(e, 'iris'); pen.stroke(e, true, .9); pen.fill(ellipse(ex + rx * .3, ey - ry * .35, rx * .3, rx * .3, 12), 'eyeWhite'); }
-      pen.stroke(quad([ex - side * rx * 1.6, ey - ry - 2], [ex, ey - ry - 9], [ex + side * rx * 1.7, ey - ry + 2]), false, .55);          // lid
-      if (P.mouthCurve > 6) pen.stroke(quad([ex + side * rx * 1.2, ey + ry + 3], [ex + side * rx * 2.2, ey + 2], [ex + side * rx * 2.4, ey - 4]), false, .45);  // crinkle
-      const by = ey - 22 + (P.browY + 78) * .6, inner = ex - side * 6, outer = ex + side * 12;
-      pen.stroke(quad([inner, by + P.browInner * .6 + side * P.browTilt * .3], [ex + side * 3, by - 4], [outer, by - P.browInner * .25 - side * P.browTilt * .3]), false, 1.1 * P.browW);
-    }
-    // nose with nostrils, then the philtrum line
-    const nose = quad([-18, 16], [-20, 2], [0, 4]).concat(quad([0, 4], [20, 2], [18, 16])).concat(quad([18, 16], [10, 32], [0, 32])).concat(quad([0, 32], [-10, 32], [-18, 16]));
-    pen.fill(nose, 'dark'); pen.stroke(nose, true, .9); pen.fill(ellipse(-6, 10, 5, 3, 10), 'eyeWhite');
-    pen.stroke([[0, 32], [0, 42]], false, .8);
-    // mouth: corners rise with mouthCurve; opens into the big grin with tongue
-    const mw = P.mouthW * 1.5, c = P.mouthCurve, cl = [-mw, 40 - c * .7], cr = [mw, 40 - c * .7];
-    if (P.mouthOpen > 1.5) {
-      const top = quad(cl, [0, 44 + c * .2], cr), lo = quad(cr, [0, 46 + P.mouthOpen * 2.6 + c * .6], cl), shape = top.concat(lo);
-      pen.fill(shape, 'dark');
-      ctx.save(); ctx.beginPath(); shape.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.clip();
-      const bottom = .5 * (40 - c * .7) + .5 * (46 + P.mouthOpen * 2.6 + c * .6), ty = bottom - 2, tg = ellipse(0, ty, mw * .5, 7 + P.mouthOpen * .45, 26);
-      pen.fill(tg, 'pink'); pen.stroke(tg, true, .7); pen.stroke([[0, ty - 6], [0, ty + 3]], false, .5); ctx.restore();
-      pen.stroke(shape, true, 1.15);
-    } else {
-      pen.stroke(quad([0, 42], [-mw * .5, 50 + c * .4], cl), false, 1.15); pen.stroke(quad([0, 42], [mw * .5, 50 + c * .4], cr), false, 1.15);
-      if (P.tongue > .05) { const tg = rrect(-11, 45, 22, 8 + P.tongue * 22, 11); pen.fill(tg, 'pink'); pen.stroke(tg, true, .8); pen.stroke([[0, 49], [0, 45 + P.tongue * 18]], false, .45); }
-    }
-    if (c > 6) for (const s of [-1, 1]) pen.stroke(quad([s * (mw + 2), 36 - c * .7], [s * (mw + 8), 40 - c * .5], [s * (mw + 6), 48 - c * .4]), false, .5);  // cheek dimples
-    for (const s of [-1, 1]) pen.fill(ellipse(s * 72, 16, 14, 8, 16), 'pink');
-    ctx.restore(); ctx.restore();
-  },
 };
+
+/* ---------- SVG rigs: characters drawn in a vector tool (or by an image AI) ----------
+   Format: <g id="..." data-pivot="x,y"> per part, plain <path>s, fills by class (fur/white/pink/dark),
+   unfilled paths are linework. Face groups (eyes-*, brows-*, mouth-*) are swapped by the rig params. */
+const SVGNS = 'http://www.w3.org/2000/svg';
+function parseSvgRig(text) {
+  text = text.replace(/xmlns="[^"]*"/, `xmlns="${SVGNS}"`);
+  const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+  const bad = doc.querySelector('parsererror'); if (bad) throw new Error('Could not read that SVG: ' + bad.textContent.slice(0, 140));
+  const host = document.createElementNS(SVGNS, 'svg'); host.setAttribute('style', 'position:absolute;width:0;height:0;overflow:hidden');
+  const probe = document.createElementNS(SVGNS, 'path'); host.appendChild(probe); document.body.appendChild(host);
+  const parts = {}, order = [];
+  doc.querySelectorAll('g[id]').forEach(g => {
+    const pv = (g.getAttribute('data-pivot') || '').split(',').map(Number);
+    const paths = [...g.querySelectorAll('path')].map(p => {
+      const d = p.getAttribute('d') || ''; probe.setAttribute('d', d);
+      const L = probe.getTotalLength(), n = Math.max(6, Math.min(260, Math.round(L / 4))), pts = [];
+      for (let i = 0; i <= n; i++) { const q = probe.getPointAtLength(L * i / n); pts.push([q.x, q.y]); }
+      const cls = (p.getAttribute('class') || '').trim();
+      return { pts, closed: /z\s*$/i.test(d), role: ['fur', 'white', 'pink', 'dark'].includes(cls) ? cls : null };
+    });
+    parts[g.id] = { pivot: pv.length === 2 && pv.every(Number.isFinite) ? pv : null, paths }; order.push(g.id);
+  });
+  host.remove();
+  if (!order.length) throw new Error('No <g id="..."> parts found in that SVG.');
+  return { parts, order };
+}
+const isFace = id => /^(eyes|brows|mouth)-/.test(id);
+function makeSvgCharacter(rig) {
+  const { parts, order } = rig;
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (const id of order) if (!isFace(id)) for (const p of parts[id].paths) for (const [x, y] of p.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const s = 440 / (y1 - y0), cx = (x0 + x1) / 2;
+  const headSet = new Set(order.filter(id => isFace(id) || /^(head|ear|nose|muzzle|cheek)/.test(id)));
+  const pick = (want, fallbacks) => [want, ...fallbacks].find(id => parts[id]);
+  const about = (ctx, pv, fn) => { if (!pv) return fn(); ctx.translate(pv[0], pv[1]); fn(); ctx.translate(-pv[0], -pv[1]); };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  return function (ctx, pen, P, S, t, sq) {
+    ctx.save(); squashAt(ctx, 190, sq); ctx.translate(0, 190); ctx.scale(s, s); ctx.translate(-cx, -y1);
+    // choose face variants from the continuous rig params
+    const eyes = P.eyeOpen < .3 ? (P.mouthCurve > 6 ? 'eyes-happy' : 'eyes-closed') : P.eyeOpen > 1.15 ? 'eyes-wide' : 'eyes-open';
+    const brows = P.browInner > 8 ? 'brows-angry' : P.browInner < -8 ? 'brows-worried' : 'brows-neutral';
+    const open = P.mouthOpen > 3 || P.tongue > .5;
+    const mouth = open ? (P.mouthW < 22 && P.mouthOpen > 3 ? 'mouth-o' : 'mouth-grin') : P.mouthCurve > 4 ? 'mouth-smile' : P.mouthCurve < -4 ? 'mouth-frown' : 'mouth-flat';
+    const show = new Set([pick(eyes, ['eyes-open']), pick(brows, ['brows-neutral']), pick(mouth, ['mouth-smile', 'mouth-flat'])]);
+    const head = parts.head && parts.head.pivot;
+    const legUp = (y, r) => clamp((70 - y) * .45, -12, 70) + r * .4;
+    for (const id of order) {
+      if (isFace(id) && !show.has(id)) continue;
+      const part = parts[id], pv = part.pivot; ctx.save();
+      if (headSet.has(id)) {          // everything on the head moves with it: bob + a tilt when quizzical
+        ctx.translate(0, Math.sin(t * 2.2 + 1) * 4);
+        about(ctx, head, () => ctx.rotate(P.browTilt * .9 * Math.PI / 180));
+      }
+      if (id === 'tail') about(ctx, pv, () => ctx.rotate(Math.sin(t * 15) * 18 * P.tailWag * Math.PI / 180));
+      if (id === 'ear-left') about(ctx, pv, () => ctx.rotate(P.earL * .8 * Math.PI / 180));
+      if (id === 'ear-right') about(ctx, pv, () => ctx.rotate(P.earR * .8 * Math.PI / 180));
+      if (id === 'leg-front-left') about(ctx, pv, () => ctx.rotate(legUp(P.lhY, P.lhR) * Math.PI / 180));
+      if (id === 'leg-front-right') about(ctx, pv, () => ctx.rotate(-(legUp(P.rhY, -P.rhR) + P.wave * Math.sin(t * 13) * 16) * Math.PI / 180));
+      if (id.startsWith('eyes-')) { ctx.translate(P.lookX * .9, P.lookY * .9);
+        about(ctx, pv, () => ctx.scale(P.eyeSize / 20, id === 'eyes-open' ? clamp(P.eyeOpen, .3, 1) : 1)); }
+      if (id.startsWith('brows-')) ctx.translate(P.lookX * .4, (P.browY + 78) * 1.1);
+      if (id.startsWith('mouth-')) about(ctx, pv && [pv[0], pv[1] - 22], () => ctx.scale(clamp(P.mouthW / 30, .6, 1.4), open ? clamp(.45 + P.mouthOpen / 18, .5, 1.25) : 1));
+      for (const p of part.paths) { if (p.role) pen.fill(p.pts, p.role); pen.stroke(p.pts, p.closed, (p.role ? 1 : .7) / s * .62); }
+      ctx.restore();
+    }
+    ctx.restore();
+  };
+}
+const HASHBROWN_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+<style>
+path { stroke: #161514; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+.fur { fill: #D87A35; } .white { fill: #FAF7F2; } .pink { fill: #F2A0A8; } .dark { fill: #161514; } .texture { fill: none; }
+</style>
+<g id="tail" data-pivot="720,375">
+<path class="fur" d="M 675 395 C 670 355 690 322 722 318 C 752 314 776 336 774 368 C 772 392 752 408 725 408 C 700 408 682 404 675 395 Z"/>
+<path class="texture" d="M 695 352 C 702 340 712 334 722 332"/>
+<path class="texture" d="M 744 336 C 752 344 758 354 758 366"/>
+<path class="texture" d="M 725 362 C 736 364 744 370 748 378"/>
+</g>
+<g id="leg-back" data-pivot="725,630">
+<path class="fur" d="M 670 615 C 675 660 695 695 705 735 C 712 765 712 795 706 825 L 776 825 C 778 785 786 735 796 685 C 804 645 792 610 755 605 C 718 600 680 605 670 615 Z"/>
+<path class="white" d="M 706 825 C 704 848 696 868 698 884 C 700 896 716 900 738 900 C 764 900 784 892 786 876 C 788 858 778 842 776 825 C 756 832 724 832 706 825 Z"/>
+<path class="texture" d="M 720 896 C 718 884 722 874 728 868"/>
+<path class="texture" d="M 748 898 C 748 886 750 876 754 870"/>
+<path class="texture" d="M 702 688 C 708 702 714 714 718 726"/>
+<path class="texture" d="M 768 740 C 765 754 762 766 760 778"/>
+</g>
+<g id="body" data-pivot="540,540">
+<path class="fur" d="M 380 450 C 445 395 545 368 645 368 C 745 368 815 415 828 505 C 838 575 815 655 772 702 C 742 735 698 730 676 695 C 645 732 588 762 515 768 C 435 774 358 742 325 685 C 295 632 308 512 380 450 Z"/>
+<path class="white" d="M 425 745 C 485 765 560 760 620 732 C 602 718 552 722 500 722 C 460 722 438 732 425 745 Z"/>
+<path class="texture" d="M 605 462 C 618 478 626 498 630 518"/>
+<path class="texture" d="M 622 532 C 626 546 626 560 624 574"/>
+<path class="texture" d="M 718 525 C 722 542 720 558 716 574"/>
+<path class="texture" d="M 792 485 C 798 502 802 520 802 538"/>
+<path class="texture" d="M 795 572 C 792 590 786 608 778 624"/>
+<path class="texture" d="M 655 678 C 668 666 680 652 688 636"/>
+<path class="texture" d="M 592 718 C 606 710 618 700 628 688"/>
+</g>
+<g id="leg-front-left" data-pivot="350,670">
+<path class="fur" d="M 308 660 C 312 710 322 752 326 792 L 392 792 C 396 752 400 708 398 660 C 370 652 332 652 308 660 Z"/>
+<path class="white" d="M 326 792 C 326 822 316 842 296 858 C 282 870 282 886 296 894 C 312 902 356 902 378 892 C 392 884 396 864 394 842 C 392 824 392 808 392 792 C 372 800 344 800 326 792 Z"/>
+<path class="texture" d="M 314 894 C 312 882 318 872 328 866"/>
+<path class="texture" d="M 342 898 C 342 886 346 876 354 870"/>
+<path class="texture" d="M 338 740 C 344 754 348 766 350 776"/>
+</g>
+<g id="leg-front-right" data-pivot="520,680">
+<path class="fur" d="M 476 668 C 480 718 484 762 486 802 L 558 802 C 562 762 568 718 570 668 C 542 660 502 660 476 668 Z"/>
+<path class="white" d="M 486 802 C 484 832 480 860 486 880 C 492 896 516 902 544 900 C 568 898 582 886 578 868 C 574 848 562 826 558 802 C 538 810 508 810 486 802 Z"/>
+<path class="texture" d="M 512 896 C 510 884 510 872 514 864"/>
+<path class="texture" d="M 538 898 C 538 886 538 874 540 866"/>
+<path class="texture" d="M 560 892 C 558 880 554 870 550 864"/>
+<path class="texture" d="M 504 752 C 508 766 512 778 514 788"/>
+</g>
+<g id="chest-ruff" data-pivot="420,540">
+<path class="white" d="M 278 508 C 254 552 252 622 276 682 C 304 750 368 796 420 822 C 468 796 538 748 568 682 C 594 624 590 552 564 504 C 522 478 470 468 420 468 C 368 468 318 480 278 508 Z"/>
+<path class="texture" d="M 294 608 C 302 626 312 644 324 658"/>
+<path class="texture" d="M 336 696 C 350 714 366 728 384 740"/>
+<path class="texture" d="M 548 602 C 540 622 530 640 518 656"/>
+<path class="texture" d="M 504 694 C 488 712 472 726 454 738"/>
+<path class="texture" d="M 374 612 C 388 624 404 632 420 634 C 436 632 452 624 466 612"/>
+<path class="texture" d="M 398 766 C 406 778 414 788 420 796"/>
+</g>
+<g id="ear-left" data-pivot="310,320">
+<path class="fur" d="M 272 355 C 248 318 222 260 226 206 C 228 176 248 164 274 176 C 308 192 340 238 358 286 C 334 312 302 338 272 355 Z"/>
+<path class="pink" d="M 276 326 C 258 294 242 252 246 214 C 248 196 260 192 276 202 C 298 216 320 250 334 286 C 314 302 294 316 276 326 Z"/>
+<path class="texture" d="M 292 272 C 300 282 308 292 314 304"/>
+<path class="texture" d="M 276 286 C 284 294 292 304 296 314"/>
+</g>
+<g id="ear-right" data-pivot="520,320">
+<path class="fur" d="M 558 355 C 582 318 608 260 604 206 C 602 176 582 164 556 176 C 522 192 490 238 472 286 C 496 312 528 338 558 355 Z"/>
+<path class="pink" d="M 554 326 C 572 294 588 252 584 214 C 582 196 570 192 554 202 C 532 216 510 250 496 286 C 516 302 536 316 554 326 Z"/>
+<path class="texture" d="M 538 272 C 530 282 522 292 516 304"/>
+<path class="texture" d="M 554 286 C 546 294 538 304 534 314"/>
+</g>
+<g id="head" data-pivot="415,490">
+<path class="fur" d="M 352 286 C 392 278 438 278 478 286 C 516 298 548 332 560 374 C 576 410 584 446 566 482 C 548 518 504 548 415 554 C 326 548 282 518 264 482 C 246 446 254 410 270 374 C 282 332 314 298 352 286 Z"/>
+<path class="white" d="M 415 282 C 426 282 434 318 434 366 C 434 396 456 416 486 432 C 520 450 532 484 510 516 C 488 542 452 554 415 554 C 378 554 342 542 320 516 C 298 484 310 450 344 432 C 374 416 396 396 396 366 C 396 318 404 282 415 282 Z"/>
+<path class="texture" d="M 278 424 C 290 420 302 418 312 418"/>
+<path class="texture" d="M 284 468 C 298 466 312 466 324 470"/>
+<path class="texture" d="M 552 424 C 540 420 528 418 518 418"/>
+<path class="texture" d="M 546 468 C 532 466 518 466 506 470"/>
+<path class="texture" d="M 382 316 C 384 328 386 340 386 352"/>
+<path class="texture" d="M 448 316 C 446 328 444 340 444 352"/>
+</g>
+<g id="eyes-open" data-pivot="415,390">
+<path class="dark" d="M 362 374 C 374 374 382 382 382 394 C 382 406 374 414 362 414 C 350 414 342 406 342 394 C 342 382 350 374 362 374 Z"/>
+<path class="white" d="M 356 382 C 360 382 362 385 362 388 C 362 391 360 394 356 394 C 352 394 350 391 350 388 C 350 385 352 382 356 382 Z"/>
+<path class="dark" d="M 468 374 C 480 374 488 382 488 394 C 488 406 480 414 468 414 C 456 414 448 406 448 394 C 448 382 456 374 468 374 Z"/>
+<path class="white" d="M 462 382 C 466 382 468 385 468 388 C 468 391 466 394 462 394 C 458 394 456 391 456 388 C 456 385 458 382 462 382 Z"/>
+</g>
+<g id="eyes-happy" data-pivot="415,390" display="none">
+<path class="texture" d="M 340 400 C 348 380 376 380 384 400"/>
+<path class="texture" d="M 446 400 C 454 380 482 380 490 400"/>
+</g>
+<g id="eyes-closed" data-pivot="415,390" display="none">
+<path class="texture" d="M 340 392 C 350 406 374 406 384 392"/>
+<path class="texture" d="M 446 392 C 456 406 480 406 490 392"/>
+</g>
+<g id="eyes-wide" data-pivot="415,390" display="none">
+<path class="white" d="M 362 366 C 378 366 388 378 388 394 C 388 410 378 422 362 422 C 346 422 336 410 336 394 C 336 378 346 366 362 366 Z"/>
+<path class="dark" d="M 362 384 C 368 384 372 388 372 394 C 372 400 368 404 362 404 C 356 404 352 400 352 394 C 352 388 356 384 362 384 Z"/>
+<path class="white" d="M 468 366 C 484 366 494 378 494 394 C 494 410 484 422 468 422 C 452 422 442 410 442 394 C 442 378 452 366 468 366 Z"/>
+<path class="dark" d="M 468 384 C 474 384 478 388 478 394 C 478 400 474 404 468 404 C 462 404 458 400 458 394 C 458 388 462 384 468 384 Z"/>
+</g>
+<g id="brows-neutral" data-pivot="415,358">
+<path class="texture" d="M 344 360 C 354 350 368 350 378 356"/>
+<path class="texture" d="M 452 356 C 462 350 476 350 486 360"/>
+</g>
+<g id="brows-angry" data-pivot="415,358" display="none">
+<path class="texture" d="M 342 348 C 356 354 370 360 382 368"/>
+<path class="texture" d="M 488 348 C 474 354 460 360 448 368"/>
+</g>
+<g id="brows-worried" data-pivot="415,358" display="none">
+<path class="texture" d="M 342 366 C 354 358 366 352 380 348"/>
+<path class="texture" d="M 488 366 C 476 358 464 352 450 348"/>
+</g>
+<g id="mouth-grin" data-pivot="415,488">
+<path class="dark" d="M 356 464 C 376 480 400 484 415 478 C 430 484 454 480 474 464 C 466 502 444 532 415 534 C 386 532 364 502 356 464 Z"/>
+<path class="pink" d="M 386 492 C 394 484 406 482 415 486 C 424 482 436 484 444 492 C 446 514 434 534 415 534 C 396 534 384 514 386 492 Z"/>
+<path class="texture" d="M 415 486 C 415 498 415 510 415 518"/>
+</g>
+<g id="mouth-smile" data-pivot="415,488" display="none">
+<path class="texture" d="M 366 472 C 382 486 402 484 415 470 C 428 484 448 486 464 472"/>
+</g>
+<g id="mouth-flat" data-pivot="415,488" display="none">
+<path class="texture" d="M 378 484 C 398 484 432 484 452 484"/>
+</g>
+<g id="mouth-frown" data-pivot="415,488" display="none">
+<path class="texture" d="M 374 494 C 392 476 438 476 456 494"/>
+</g>
+<g id="mouth-o" data-pivot="415,488" display="none">
+<path class="dark" d="M 415 472 C 430 472 438 482 438 496 C 438 510 430 520 415 520 C 400 520 392 510 392 496 C 392 482 400 472 415 472 Z"/>
+<path class="pink" d="M 402 508 C 408 502 422 502 428 508 C 424 516 406 516 402 508 Z"/>
+</g>
+<g id="nose" data-pivot="415,448">
+<path class="dark" d="M 390 436 C 402 428 428 428 440 436 C 446 442 442 454 430 462 C 422 468 408 468 400 462 C 388 454 384 442 390 436 Z"/>
+<path class="white" d="M 402 438 C 410 436 418 436 424 438 C 420 442 406 442 402 438 Z"/>
+</g>
+</svg>`;
+CHARACTERS.hashbrown = makeSvgCharacter(parseSvgRig(HASHBROWN_SVG));
 
 function drawCharacter(ctx, P, S, t, who = 'fridge') {
   const W = ctx.canvas.width, H = ctx.canvas.height;
@@ -548,7 +661,7 @@ function look() { // what's on stage right now
 }
 function tiles(items) {
   tabbody.innerHTML = `<div class="grid">${items.map((it, i) => `<button class="tile" data-i="${i}" aria-pressed="false"><canvas width="300" height="216"></canvas><span>${it.label}</span></button>`).join('')}</div>`;
-  tabbody.querySelectorAll('.tile').forEach(b => b.onclick = () => act(items[+b.dataset.i].change));
+  tabbody.querySelectorAll('.tile[data-i]').forEach(b => b.onclick = () => act(items[+b.dataset.i].change));
 }
 let tabItems = [], thumbKey = '';
 function buildTab() {
@@ -565,6 +678,7 @@ function buildTab() {
       r.onchange = () => { if (playing) act({ set: { [r.dataset.k]: +r.value } }, true); };
     });
   } else tiles(tabItems);
+  if (tab === 'character') { const b = document.createElement('button'); b.className = 'tile import'; b.innerHTML = '<span>＋ Import SVG character…</span>'; b.onclick = () => $('svgFile').click(); tabbody.querySelector('.grid').appendChild(b); }
   thumbKey = ''; refreshThumbs(true);
 }
 document.querySelectorAll('[role=tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; buildTab(); });
@@ -573,7 +687,7 @@ function refreshThumbs(force) {
   const L = look(), key = JSON.stringify([tab, L]);
   if (!force && key === thumbKey) return; thumbKey = key;
   if (tab === 'design') return;
-  tabbody.querySelectorAll('.tile').forEach((b, i) => {
+  tabbody.querySelectorAll('.tile[data-i]').forEach((b, i) => {
     const ch = tabItems[i].change, who = ch.character || L.who, style = ch.style || L.style, color = ch.style ? ch.color || null : L.color, pose = ch.pose || L.pose;
     const c2 = b.querySelector('canvas').getContext('2d');
     drawCharacter(c2, { ...BASE, ...POSES[pose] }, { ...STYLES[style], color }, 0.4, who);
@@ -617,6 +731,14 @@ $('restart').onclick = () => { live = null; seek(0); updateMode(); };
 scrub.oninput = () => { live = null; seek(scrub.value / 1000 * C.duration); updateMode(); };
 code.oninput = bpmEl.oninput = bpbEl.oninput = rebuild;
 $('loadSong').onclick = () => $('audioFile').click();
+$('svgFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return; e.target.value = '';
+  try {
+    const name = f.name.replace(/\.svg$/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'imported';
+    CHARACTERS[name] = makeSvgCharacter(parseSvgRig(await f.text())); LABELS[name] = cap(name);
+    rebuild(); buildTab(); act({ character: name }, true);
+  } catch (x) { err.textContent = x.message; }
+};
 $('audioFile').onchange = e => { const f = e.target.files[0]; if (!f) return; audio.src = URL.createObjectURL(f); hasAudio = true; seek(0); setPlaying(true); };
 document.addEventListener('keydown', e => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); setPlaying(!playing); } });
 

@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+<style>
+path { stroke: #161514; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+.fur { fill: #D87A35; } .white { fill: #FAF7F2; } .pink { fill: #F2A0A8; } .dark { fill: #161514; } .texture { fill: none; }
+</style>
+<g id="tail" data-pivot="720,375">
+<path class="fur" d="M 675 395 C 670 355 690 322 722 318 C 752 314 776 336 774 368 C 772 392 752 408 725 408 C 700 408 682 404 675 395 Z"/>
+<path class="texture" d="M 695 352 C 702 340 712 334 722 332"/>
+<path class="texture" d="M 744 336 C 752 344 758 354 758 366"/>
+<path class="texture" d="M 725 362 C 736 364 744 370 748 378"/>
+</g>
+<g id="leg-back" data-pivot="725,630">
+<path class="fur" d="M 670 615 C 675 660 695 695 705 735 C 712 765 712 795 706 825 L 776 825 C 778 785 786 735 796 685 C 804 645 792 610 755 605 C 718 600 680 605 670 615 Z"/>
+<path class="white" d="M 706 825 C 704 848 696 868 698 884 C 700 896 716 900 738 900 C 764 900 784 892 786 876 C 788 858 778 842 776 825 C 756 832 724 832 706 825 Z"/>
+<path class="texture" d="M 720 896 C 718 884 722 874 728 868"/>
+<path class="texture" d="M 748 898 C 748 886 750 876 754 870"/>
+<path class="texture" d="M 702 688 C 708 702 714 714 718 726"/>
+<path class="texture" d="M 768 740 C 765 754 762 766 760 778"/>
+</g>
+<g id="body" data-pivot="540,540">
+<path class="fur" d="M 380 450 C 445 395 545 368 645 368 C 745 368 815 415 828 505 C 838 575 815 655 772 702 C 742 735 698 730 676 695 C 645 732 588 762 515 768 C 435 774 358 742 325 685 C 295 632 308 512 380 450 Z"/>
+<path class="white" d="M 425 745 C 485 765 560 760 620 732 C 602 718 552 722 500 722 C 460 722 438 732 425 745 Z"/>
+<path class="texture" d="M 605 462 C 618 478 626 498 630 518"/>
+<path class="texture" d="M 622 532 C 626 546 626 560 624 574"/>
+<path class="texture" d="M 718 525 C 722 542 720 558 716 574"/>
+<path class="texture" d="M 792 485 C 798 502 802 520 802 538"/>
+<path class="texture" d="M 795 572 C 792 590 786 608 778 624"/>
+<path class="texture" d="M 655 678 C 668 666 680 652 688 636"/>
+<path class="texture" d="M 592 718 C 606 710 618 700 628 688"/>
+</g>
+<g id="leg-front-left" data-pivot="350,670">
+<path class="fur" d="M 308 660 C 312 710 322 752 326 792 L 392 792 C 396 752 400 708 398 660 C 370 652 332 652 308 660 Z"/>
+<path class="white" d="M 326 792 C 326 822 316 842 296 858 C 282 870 282 886 296 894 C 312 902 356 902 378 892 C 392 884 396 864 394 842 C 392 824 392 808 392 792 C 372 800 344 800 326 792 Z"/>
+<path class="texture" d="M 314 894 C 312 882 318 872 328 866"/>
+<path class="texture" d="M 342 898 C 342 886 346 876 354 870"/>
+<path class="texture" d="M 338 740 C 344 754 348 766 350 776"/>
+</g>
+<g id="leg-front-right" data-pivot="520,680">
+<path class="fur" d="M 476 668 C 480 718 484 762 486 802 L 558 802 C 562 762 568 718 570 668 C 542 660 502 660 476 668 Z"/>
+<path class="white" d="M 486 802 C 484 832 480 860 486 880 C 492 896 516 902 544 900 C 568 898 582 886 578 868 C 574 848 562 826 558 802 C 538 810 508 810 486 802 Z"/>
+<path class="texture" d="M 512 896 C 510 884 510 872 514 864"/>
+<path class="texture" d="M 538 898 C 538 886 538 874 540 866"/>
+<path class="texture" d="M 560 892 C 558 880 554 870 550 864"/>
+<path class="texture" d="M 504 752 C 508 766 512 778 514 788"/>
+</g>
+<g id="chest-ruff" data-pivot="420,540">
+<path class="white" d="M 278 508 C 254 552 252 622 276 682 C 304 750 368 796 420 822 C 468 796 538 748 568 682 C 594 624 590 552 564 504 C 522 478 470 468 420 468 C 368 468 318 480 278 508 Z"/>
+<path class="texture" d="M 294 608 C 302 626 312 644 324 658"/>
+<path class="texture" d="M 336 696 C 350 714 366 728 384 740"/>
+<path class="texture" d="M 548 602 C 540 622 530 640 518 656"/>
+<path class="texture" d="M 504 694 C 488 712 472 726 454 738"/>
+<path class="texture" d="M 374 612 C 388 624 404 632 420 634 C 436 632 452 624 466 612"/>
+<path class="texture" d="M 398 766 C 406 778 414 788 420 796"/>
+</g>
+<g id="ear-left" data-pivot="310,320">
+<path class="fur" d="M 272 355 C 248 318 222 260 226 206 C 228 176 248 164 274 176 C 308 192 340 238 358 286 C 334 312 302 338 272 355 Z"/>
+<path class="pink" d="M 276 326 C 258 294 242 252 246 214 C 248 196 260 192 276 202 C 298 216 320 250 334 286 C 314 302 294 316 276 326 Z"/>
+<path class="texture" d="M 292 272 C 300 282 308 292 314 304"/>
+<path class="texture" d="M 276 286 C 284 294 292 304 296 314"/>
+</g>
+<g id="ear-right" data-pivot="520,320">
+<path class="fur" d="M 558 355 C 582 318 608 260 604 206 C 602 176 582 164 556 176 C 522 192 490 238 472 286 C 496 312 528 338 558 355 Z"/>
+<path class="pink" d="M 554 326 C 572 294 588 252 584 214 C 582 196 570 192 554 202 C 532 216 510 250 496 286 C 516 302 536 316 554 326 Z"/>
+<path class="texture" d="M 538 272 C 530 282 522 292 516 304"/>
+<path class="texture" d="M 554 286 C 546 294 538 304 534 314"/>
+</g>
+<g id="head" data-pivot="415,490">
+<path class="fur" d="M 352 286 C 392 278 438 278 478 286 C 516 298 548 332 560 374 C 576 410 584 446 566 482 C 548 518 504 548 415 554 C 326 548 282 518 264 482 C 246 446 254 410 270 374 C 282 332 314 298 352 286 Z"/>
+<path class="white" d="M 415 282 C 426 282 434 318 434 366 C 434 396 456 416 486 432 C 520 450 532 484 510 516 C 488 542 452 554 415 554 C 378 554 342 542 320 516 C 298 484 310 450 344 432 C 374 416 396 396 396 366 C 396 318 404 282 415 282 Z"/>
+<path class="texture" d="M 278 424 C 290 420 302 418 312 418"/>
+<path class="texture" d="M 284 468 C 298 466 312 466 324 470"/>
+<path class="texture" d="M 552 424 C 540 420 528 418 518 418"/>
+<path class="texture" d="M 546 468 C 532 466 518 466 506 470"/>
+<path class="texture" d="M 382 316 C 384 328 386 340 386 352"/>
+<path class="texture" d="M 448 316 C 446 328 444 340 444 352"/>
+</g>
+<g id="eyes-open" data-pivot="415,390">
+<path class="dark" d="M 362 374 C 374 374 382 382 382 394 C 382 406 374 414 362 414 C 350 414 342 406 342 394 C 342 382 350 374 362 374 Z"/>
+<path class="white" d="M 356 382 C 360 382 362 385 362 388 C 362 391 360 394 356 394 C 352 394 350 391 350 388 C 350 385 352 382 356 382 Z"/>
+<path class="dark" d="M 468 374 C 480 374 488 382 488 394 C 488 406 480 414 468 414 C 456 414 448 406 448 394 C 448 382 456 374 468 374 Z"/>
+<path class="white" d="M 462 382 C 466 382 468 385 468 388 C 468 391 466 394 462 394 C 458 394 456 391 456 388 C 456 385 458 382 462 382 Z"/>
+</g>
+<g id="eyes-happy" data-pivot="415,390" display="none">
+<path class="texture" d="M 340 400 C 348 380 376 380 384 400"/>
+<path class="texture" d="M 446 400 C 454 380 482 380 490 400"/>
+</g>
+<g id="eyes-closed" data-pivot="415,390" display="none">
+<path class="texture" d="M 340 392 C 350 406 374 406 384 392"/>
+<path class="texture" d="M 446 392 C 456 406 480 406 490 392"/>
+</g>
+<g id="eyes-wide" data-pivot="415,390" display="none">
+<path class="white" d="M 362 366 C 378 366 388 378 388 394 C 388 410 378 422 362 422 C 346 422 336 410 336 394 C 336 378 346 366 362 366 Z"/>
+<path class="dark" d="M 362 384 C 368 384 372 388 372 394 C 372 400 368 404 362 404 C 356 404 352 400 352 394 C 352 388 356 384 362 384 Z"/>
+<path class="white" d="M 468 366 C 484 366 494 378 494 394 C 494 410 484 422 468 422 C 452 422 442 410 442 394 C 442 378 452 366 468 366 Z"/>
+<path class="dark" d="M 468 384 C 474 384 478 388 478 394 C 478 400 474 404 468 404 C 462 404 458 400 458 394 C 458 388 462 384 468 384 Z"/>
+</g>
+<g id="brows-neutral" data-pivot="415,358">
+<path class="texture" d="M 344 360 C 354 350 368 350 378 356"/>
+<path class="texture" d="M 452 356 C 462 350 476 350 486 360"/>
+</g>
+<g id="brows-angry" data-pivot="415,358" display="none">
+<path class="texture" d="M 342 348 C 356 354 370 360 382 368"/>
+<path class="texture" d="M 488 348 C 474 354 460 360 448 368"/>
+</g>
+<g id="brows-worried" data-pivot="415,358" display="none">
+<path class="texture" d="M 342 366 C 354 358 366 352 380 348"/>
+<path class="texture" d="M 488 366 C 476 358 464 352 450 348"/>
+</g>
+<g id="mouth-grin" data-pivot="415,488">
+<path class="dark" d="M 356 464 C 376 480 400 484 415 478 C 430 484 454 480 474 464 C 466 502 444 532 415 534 C 386 532 364 502 356 464 Z"/>
+<path class="pink" d="M 386 492 C 394 484 406 482 415 486 C 424 482 436 484 444 492 C 446 514 434 534 415 534 C 396 534 384 514 386 492 Z"/>
+<path class="texture" d="M 415 486 C 415 498 415 510 415 518"/>
+</g>
+<g id="mouth-smile" data-pivot="415,488" display="none">
+<path class="texture" d="M 366 472 C 382 486 402 484 415 470 C 428 484 448 486 464 472"/>
+</g>
+<g id="mouth-flat" data-pivot="415,488" display="none">
+<path class="texture" d="M 378 484 C 398 484 432 484 452 484"/>
+</g>
+<g id="mouth-frown" data-pivot="415,488" display="none">
+<path class="texture" d="M 374 494 C 392 476 438 476 456 494"/>
+</g>
+<g id="mouth-o" data-pivot="415,488" display="none">
+<path class="dark" d="M 415 472 C 430 472 438 482 438 496 C 438 510 430 520 415 520 C 400 520 392 510 392 496 C 392 482 400 472 415 472 Z"/>
+<path class="pink" d="M 402 508 C 408 502 422 502 428 508 C 424 516 406 516 402 508 Z"/>
+</g>
+<g id="nose" data-pivot="415,448">
+<path class="dark" d="M 390 436 C 402 428 428 428 440 436 C 446 442 442 454 430 462 C 422 468 408 468 400 462 C 388 454 384 442 390 436 Z"/>
+<path class="white" d="M 402 438 C 410 436 418 436 424 438 C 420 442 406 442 402 438 Z"/>
+</g>
+</svg>
