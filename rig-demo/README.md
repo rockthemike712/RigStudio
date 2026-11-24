@@ -5,7 +5,7 @@ A code-driven character animation engine: **every frame is a pure function of `(
 - **Rig**: the character is a set of numbers (`eyeOpen`, `browInner`, `mouthCurve`, `rhY`, …), with no drawings. Because they're numbers, anything can tween into anything.
 - **Poses**: named partial parameter sets (`thinking`, `furious`, `laughing`, …).
 - **Styles**: renderers that draw the *same* rig geometry differently (`pencil`, `blueprint`, `ink`, `hologram`, `paint`). Swapping a style doesn't touch the animation.
-- **Characters**: `fridge` and `corgi`. They read the same params, so every pose and style works on both. Switch with `{ at: [10, 1], character: 'corgi' }`. Characters can also use extra channels (the corgi uses `earL`, `earR`, `tailWag` and `tongue`), which other characters ignore.
+- **Characters**: `fridge` and `hashbrown` (a red-and-white Pembroke modelled on a real dog). They read the same params, so every pose and style works on both. Switch with `{ at: [10, 1], character: 'hashbrown' }`. Characters can also use extra channels (Hashbrown uses `earL`, `earR`, `tailWag` and `tongue`), which other characters ignore.
 - **Score**: events in musical time, `{ at: [bar, beat], pose | style | set | talk }`, compiled to keyframes with an overshoot ease, plus always-on secondary motion (breathing, blinking, 12fps line "boil", lip flap).
 
 ## Run it
