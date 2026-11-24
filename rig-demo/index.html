@@ -189,6 +189,27 @@ const STYLES = {
                        side:{ base:'#ebe5d6', dots:'rgba(20,20,20,.5)', size:8 }, hand:'#ebe5d6' } },
   cutpaper:  { bg:'#e7dfcd', ink:'#2a2520', w:1.6, jitter:1.4, passes:1, grain:.12, shapeShadow:'rgba(70,45,20,.4)', shadow:'rgba(70,45,20,.18)',
                fills:{ body:'#5aa1c9', side:'#3f7fa6', dark:'#2a2520', eyeWhite:'#fbf7ee', hand:'#f2c14e', iris:'#2a2520', fur:'#d9692b', white:'#fbf7ee', pink:'#f19aa8' } },
+  pixelwind: { bg:'#f1efe9', ink:'#222222', w:2.4, jitter:1.6, passes:2, post:'pixelwind', shadow:'rgba(0,0,0,.1)',
+               fills:{ dark:'#222222', iris:'#222222', eyeWhite:'#f1efe9', fur:'#efc39c', white:'#f6f3ec', pink:'#f2b7c4', body:'#f1efe9', side:'#dcd7cb', hand:'#f1efe9' } },
+  pop:       { bg:'#ffffff', bgFx:'rays', ink:'#111111', w:3, jitter:.6, passes:1, shadow:'rgba(236,0,140,.25)',
+               layers:[
+                 { comp:'multiply', ink:'#00aeef', fills:{ ...allFills('#ffffff'), body:'#00aeef', side:'#00aeef', iris:'#00aeef', dark:'#00aeef' } },
+                 { comp:'multiply', ink:'#ec008c', offset:[8, -5], shadow:null, fills:{ ...allFills('#ffffff'), fur:'#ec008c', side:{ base:'#ffffff', dots:'#ec008c', size:11 }, pink:'#ec008c', hand:'#ec008c', dark:'#ec008c' } },
+                 { comp:'multiply', ink:'#ffd400', offset:[-6, 6], shadow:null, fills:{ ...allFills('#ffffff'), white:'#ffd400', body:{ base:'#ffffff', dots:'#ffd400', size:11 }, hand:'#ffd400', fur:{ base:'#ffffff', dots:'#ffd400', size:11 } } },
+                 { shadow:null, w:3.2, fills:{ dark:'#111111', iris:'#111111' } } ] },
+  foil:      { bg:'#15121d', ink:'#fbeefe', w:2.4, jitter:.3, passes:1, glow:10, post:'sparkle', shadow:'rgba(255,190,230,.12)',
+               fills:{ fur:{ foil:true, hue:330 }, body:{ foil:true, hue:180 }, side:{ foil:true, hue:220, light:66 }, white:{ foil:true, hue:40, light:86 }, pink:{ foil:true, hue:300 },
+                       hand:{ foil:true, hue:50 }, dark:'#15121d', eyeWhite:'#fbeefe', iris:'#15121d' } },
+  rgb:       { bg:'#07080c', ink:'#e6f4ff', w:2.6, jitter:.4, passes:1, post:'rgb', shadow:'rgba(120,200,255,.12)',
+               fills:{ fur:'#1b2740', body:'#1b2740', side:'#101828', white:'#2c3958', hand:'#2c3958', pink:'#ff2a6d', dark:'#e6f4ff', eyeWhite:'#07080c', iris:'#e6f4ff' } },
+  vhs:       { bg:'#cfc7b3', ink:'#1d1b19', w:4, jitter:.6, passes:1, post:'vhs', shadow:'rgba(0,0,0,.18)',
+               fills:{ body:'#f6f2ea', side:'#cfc6b2', dark:'#1d1b19', eyeWhite:'#ffffff', hand:'#f2c14e', iris:'#4a2b14', fur:'#e0843a', white:'#fbf8f2', pink:'#f48aa0' } },
+  acid:      { bg:'#000000', bgFx:'rings', ink:'#111111', w:7, jitter:1.2, passes:1, post:'wobble', shadow:'rgba(0,0,0,.35)',
+               fills:{ fur:{ rainbow:true }, body:{ rainbow:true, hue:120 }, side:{ rainbow:true, hue:240 }, hand:{ rainbow:true, hue:60 },
+                       white:'#ffffff', pink:'#ff5fd2', dark:'#111111', eyeWhite:'#ffffff', iris:'#111111' } },
+  static:    { bg:'#f4f2ee', ink:'#151515', w:3.4, jitter:1, passes:1, shadow:'rgba(0,0,0,.12)',
+               fills:{ fur:{ noise:'rainbow' }, body:{ noise:'rainbow' }, side:{ noise:'rainbow' }, hand:{ noise:'rainbow' }, white:{ noise:'bw' }, pink:{ noise:'pink' },
+                       dark:'#151515', eyeWhite:'#ffffff', iris:'#151515' } },
   paint:     { bg:'#f4efe4', ink:'#2b2118', w:4, jitter:1.1, passes:1, shadow:'rgba(60,40,20,.2)',
                fills:{ body:'PAINT', side:'rgba(60,90,60,.55)', dark:'#2b2118', eyeWhite:'#fff8ea', hand:'#e8a93a', iris:'#6b3a1a', fur:'PAINT_WARM', white:'#fff8ea', pink:'#e86a7e' } },
 };
@@ -277,6 +298,22 @@ function makePen(ctx, S, seed, t) {
           const pat = ctx.createPattern(dotTile(c.dots, c.size || 9, ctx.canvas.width), 'repeat');
           pat.setTransform(new DOMMatrix().scale(1 / Math.hypot(m.a, m.b)).rotate(c.angle ?? 15)); ctx.fillStyle = pat; ctx.fillRect(x0 - 50, y0 - 50, x1 - x0 + 100, y1 - y0 + 100);
         }
+        if (c.foil) {                     // iridescent foil that shifts as it moves, with a travelling sheen
+          const g = ctx.createLinearGradient(x0, y0, x1, y1), h0 = (c.hue || 0) + t * 50;
+          for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, `hsl(${(h0 + i * 52) % 360}, 88%, ${c.light || 76}%)`);
+          ctx.fillStyle = g; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+          const sp = ((t * .45 + (c.hue || 0) / 360) % 1.6) - .3, g2 = ctx.createLinearGradient(x0, y0, x1, y1);
+          g2.addColorStop(Math.min(1, Math.max(0, sp - .12)), 'rgba(255,255,255,0)'); g2.addColorStop(Math.min(1, Math.max(0, sp)), 'rgba(255,255,255,.75)'); g2.addColorStop(Math.min(1, Math.max(0, sp + .12)), 'rgba(255,255,255,0)');
+          ctx.fillStyle = g2; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+        }
+        if (c.rainbow) {                  // acid stripes that crawl through the hues
+          const band = 18 / px, h = y1 - y0; ctx.lineWidth = band * 1.05;
+          for (let k = x0 - h, i = 0; k < x1 + band; k += band, i++) { ctx.strokeStyle = `hsl(${((c.hue || 0) + i * 32 - t * 200) % 360 + 360}, 96%, 58%)`; ctx.beginPath(); ctx.moveTo(k, y1); ctx.lineTo(k + h, y0); ctx.stroke(); }
+        }
+        if (c.noise) {                    // TV-static colour noise, re-rolled on the boil
+          const pat = ctx.createPattern(noiseTile(c.noise, seed % 4), 'repeat');
+          pat.setTransform(new DOMMatrix().scale(3.2 / Math.hypot(m.a, m.b) * (ctx.canvas.width / 1920))); ctx.fillStyle = pat; ctx.fillRect(x0 - 10, y0 - 10, x1 - x0 + 20, y1 - y0 + 20);
+        }
         if (c.scribble) {                 // crayon / chalk: jittery diagonal strokes that re-scribble on the boil
           ctx.strokeStyle = c.scribble; ctx.lineWidth = (c.lw || 3.2) / px; ctx.lineCap = 'round';
           const step = (c.step || 9) / px, h = y1 - y0;
@@ -300,6 +337,20 @@ function dotTile(color, size, W) {           // one halftone cell, sized in scre
   g.fillStyle = color; g.beginPath(); g.arc(px / 2, px / 2, px * .3, 0, TAU); g.fill();
   return (_tiles[key] = c);
 }
+const _noise = {};
+function noiseTile(kind, v) {
+  const key = kind + v; if (_noise[key]) return _noise[key];
+  const c = document.createElement('canvas'); c.width = c.height = 96; const g = c.getContext('2d'), im = g.createImageData(96, 96);
+  const hsl = (h, s2, l) => { s2 /= 100; l /= 100; const f = n => { const k = (n + h / 30) % 12; return 255 * (l - s2 * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1))); }; return [f(0), f(8), f(4)]; };
+  for (let i = 0; i < im.data.length; i += 4) {
+    const r = Math.random(); let col;
+    if (kind === 'bw') { const l = 40 + r * 60; col = hsl(0, 0, l); }
+    else if (kind === 'pink') col = hsl(320 + r * 40, 90, 60 + Math.random() * 25);
+    else col = hsl(Math.random() * 360, 95, 45 + r * 30);
+    im.data[i] = col[0]; im.data[i + 1] = col[1]; im.data[i + 2] = col[2]; im.data[i + 3] = 255;
+  }
+  g.putImageData(im, 0, 0); return (_noise[key] = c);
+}
 let _grain = null;
 function grainTile() {
   if (_grain) return _grain;
@@ -307,7 +358,7 @@ function grainTile() {
   for (let i = 0; i < im.data.length; i += 4) { const v = 150 + Math.random() * 105; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; }
   g.putImageData(im, 0, 0); return (_grain = c);
 }
-const _pix = document.createElement('canvas'), _layer = document.createElement('canvas');
+const _pix = document.createElement('canvas'), _layer = document.createElement('canvas'), _fig = document.createElement('canvas'), _tint = document.createElement('canvas');
 
 /* ---------- draw the rig ---------- */
 // Shared parts: any character can reuse these, so every pose works on every character.
@@ -570,14 +621,19 @@ CHARACTERS.hashbrown = makeSvgCharacter(parseSvgRig(HASHBROWN_SVG));
 function drawCharacter(ctx, P, S, t, who = 'fridge') {
   const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920;
   const seed = Math.floor(t * 12);               // "boil": redraw jitter 12×/sec like hand animation
+  const posts = [].concat(S.post || []);
   ctx.fillStyle = S.bg; ctx.fillRect(0, 0, W, H);
   if (S.bgDots) { const pat = ctx.createPattern(dotTile(S.bgDots, S.bgDotSize || 16, W), 'repeat'); pat.setTransform(new DOMMatrix().rotate(20)); ctx.fillStyle = pat; ctx.fillRect(0, 0, W, H); }
+  if (S.bgFx) backgroundFx(ctx, S.bgFx, t, P);
 
+  // the figure normally lands straight on the frame; pixel wind needs it on its own sheet first
+  const main = ctx, figMode = posts.includes('pixelwind');
+  if (figMode) { _fig.width = W; _fig.height = H; }
+  const base = figMode ? _fig.getContext('2d') : main;
   // a style can be several printed passes: misregistered riso inks, a sticker's white backing, etc.
   const layers = S.layers ? S.layers.map(l => ({ ...S, ...l, layers: null })) : [S];
-  const main = ctx;
   layers.forEach((L, li) => {
-    if (L.comp) { _layer.width = W; _layer.height = H; ctx = _layer.getContext('2d'); }   // draw the pass on its own sheet
+    if (L.comp) { _layer.width = W; _layer.height = H; ctx = _layer.getContext('2d'); } else ctx = base;
     const pen = makePen(ctx, L, seed + li * 5, t);
     ctx.save();
     if (L.offset) ctx.translate(L.offset[0] * k, L.offset[1] * k);
@@ -591,8 +647,10 @@ function drawCharacter(ctx, P, S, t, who = 'fridge') {
     ctx.rotate(P.tilt * Math.PI / 180);
     CHARACTERS[who](ctx, pen, P, L, t, P.squash + breathe * .012);
     ctx.restore();
-    if (L.comp) { ctx = main; ctx.save(); ctx.globalCompositeOperation = L.comp; ctx.drawImage(_layer, 0, 0); ctx.restore(); }
+    if (L.comp) { base.save(); base.globalCompositeOperation = L.comp; base.drawImage(_layer, 0, 0); base.restore(); }
   });
+  ctx = main;
+  if (figMode) pixelWind(ctx, _fig, t, S);
 
   // post effects on the whole frame
   if (S.pixel) {
@@ -600,8 +658,91 @@ function drawCharacter(ctx, P, S, t, who = 'fridge') {
     _pix.width = bw; _pix.height = bh; _pix.getContext('2d').drawImage(ctx.canvas, 0, 0, bw, bh);
     ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(_pix, 0, 0, bw, bh, 0, 0, W, H); ctx.restore();
   }
+  for (const fx of posts) { if (fx === 'rgb') rgbGlitch(ctx, t); if (fx === 'vhs') vhsTape(ctx, t); if (fx === 'wobble') wobble(ctx, t); if (fx === 'sparkle') sparkle(ctx, t); }
   if (S.grain) { ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = S.grain; ctx.fillStyle = ctx.createPattern(grainTile(), 'repeat'); ctx.fillRect(0, 0, W, H); ctx.restore(); }
   if (S.holo) { ctx.fillStyle = 'rgba(255,255,255,.035)'; for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 1); }
+}
+
+/* ---------- glitch & trip effects ---------- */
+function backgroundFx(ctx, kind, t, P) {
+  const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, cx = W / 2 + P.camX * k, cy = H / 2 - 60 * k;
+  ctx.save();
+  if (kind === 'rays') {               // pop-art burst: CMY dashes radiating from the character, pulsing
+    const cols = ['#00aeef', '#ec008c', '#ffd400'], beat = Math.abs(Math.sin(t * Math.PI * 100 / 60));
+    ctx.lineCap = 'round'; ctx.lineWidth = 9 * k;
+    for (let i = 0; i < 44; i++) { const a = i / 44 * TAU + t * .15, r0 = (330 + rnd(i, 2) * 60) * k, r1 = r0 + (50 + rnd(i, 3) * 120 + beat * 40) * k;
+      ctx.strokeStyle = cols[i % 3]; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); ctx.stroke(); }
+  }
+  if (kind === 'rings') {              // concentric rainbow rings flowing outward
+    const R = Math.hypot(W, H) * .6, step = 46 * k;
+    for (let r = R, i = 0; r > 0; r -= step, i++) { ctx.fillStyle = `hsl(${(r / k * .55 - t * 140) % 360 + 360}, 92%, ${i % 2 ? 56 : 64}%)`; ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill(); }
+  }
+  ctx.restore();
+}
+function pixelWind(ctx, fig, t, S) {      // the figure dissolves into static and blows off to the right
+  const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, b = Math.max(2, Math.round(7 * k));
+  const gw = Math.ceil(W / b), gh = Math.ceil(H / b);
+  _pix.width = gw; _pix.height = gh; const pc = _pix.getContext('2d', { willReadFrequently: true }); pc.drawImage(fig, 0, 0, gw, gh);
+  const d = pc.getImageData(0, 0, gw, gh).data;
+  let x0 = gw, x1 = 0; for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) if (d[(y * gw + x) * 4 + 3] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; }
+  ctx.drawImage(fig, 0, 0);
+  if (x1 <= x0) return;
+  const span = x1 - x0, front = x0 + span * (.42 + .3 * Math.sin(t * .8)), seed = Math.floor(t * 12), cols = ['#00e5ff', '#ff2bd6', '#ffe600', '#111', '#fff'];
+  const blown = [];
+  for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {
+    const i = (y * gw + x) * 4; if (d[i + 3] < 40) continue;
+    const u = (x - front) / span, r = rnd(x * 131 + y, seed);
+    if (u > -.3 && r < Math.min(.85, (u + .3) * 1.8)) { ctx.fillStyle = cols[(x * 7 + y * 3 + seed) % 5]; ctx.fillRect(x * b, y * b, b, b); }
+    if (u > 0 && rnd(y * 977 + x, seed + 1) < Math.min(.92, u * 2.2)) {
+      ctx.fillStyle = S.bg; ctx.fillRect(x * b, y * b, b, b);
+      blown.push([x * b + (u * 300 + rnd(x, y + seed) * 260) * k, y * b + (rnd(y, x + seed) - .5) * 90 * u * k, rnd(x + y, seed) < .5 ? `rgb(${d[i]},${d[i + 1]},${d[i + 2]})` : cols[(x + seed) % 5]]);
+    }
+  }
+  for (const [x, y, c] of blown) { ctx.fillStyle = c; ctx.fillRect(x, y, b, b); }
+}
+function rgbGlitch(ctx, t) {              // channel split + sliced bands + corrupt blocks, with bursts
+  const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, seed = Math.floor(t * 12), burst = rnd(seed, 9) > .55 ? 1 : 0;
+  _layer.width = W; _layer.height = H; _layer.getContext('2d').drawImage(ctx.canvas, 0, 0);
+  _tint.width = W; _tint.height = H; const tc = _tint.getContext('2d');
+  const off = (11 + burst * 30 + Math.sin(t * 7) * 4) * k;
+  ctx.save(); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'lighter';
+  for (const [col, dx, dy] of [['#ff0000', -off, 0], ['#00ff00', 0, burst * 3 * k], ['#0000ff', off, 0]]) {
+    tc.globalCompositeOperation = 'source-over'; tc.drawImage(_layer, 0, 0); tc.globalCompositeOperation = 'multiply'; tc.fillStyle = col; tc.fillRect(0, 0, W, H);
+    ctx.drawImage(_tint, dx, dy);
+  }
+  ctx.restore();
+  const n = burst ? 9 : 3;
+  for (let i = 0; i < n; i++) { const y = rnd(i, seed + 3) * H, h = (3 + rnd(i, seed + 4) * (burst ? 70 : 18)) * k, dx = (rnd(i, seed + 5) - .5) * (burst ? 220 : 40) * k; ctx.drawImage(_layer, 0, y, W, h, dx, y, W, h); }
+  if (burst) { ctx.save(); ctx.globalCompositeOperation = 'difference'; for (let i = 0; i < 5; i++) { ctx.fillStyle = ['#0ff', '#f0f', '#ff0', '#fff'][i % 4]; ctx.fillRect(rnd(i, seed + 6) * W, rnd(i, seed + 7) * H, (40 + rnd(i, seed + 8) * 260) * k, (6 + rnd(i, seed + 9) * 40) * k); } ctx.restore(); }
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; for (let y = 0; y < H; y += 3 * k) ctx.fillRect(0, y, W, k);
+}
+function vhsTape(ctx, t) {                // wobbly tracking, colour bleed, rolling bar, static, on-screen display
+  const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, seed = Math.floor(t * 12);
+  _layer.width = W; _layer.height = H; _layer.getContext('2d').drawImage(ctx.canvas, 0, 0);
+  const band = Math.max(2, Math.round(6 * k)), roll = ((t * 140 * k) % (H * 1.4)) - H * .2;
+  for (let y = 0; y < H; y += band) { const near = Math.abs(y - roll) < 50 * k ? 1 : 0, dx = (Math.sin(y * .013 + t * 2.7) * 5 + near * (rnd(y, seed) - .5) * 70) * k; ctx.drawImage(_layer, 0, y, W, band, dx, y, W, band); }
+  ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = .55;
+  _tint.width = W; _tint.height = H; const tc = _tint.getContext('2d'); tc.drawImage(_layer, 0, 0); tc.globalCompositeOperation = 'multiply'; tc.fillStyle = '#ff0040'; tc.fillRect(0, 0, W, H);
+  ctx.drawImage(_tint, 12 * k, 0); ctx.restore();
+  ctx.save(); ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = .5; const pat = ctx.createPattern(noiseTile('bw', seed % 4), 'repeat'); pat.setTransform(new DOMMatrix().scale(2.5 * k)); ctx.fillStyle = pat; ctx.fillRect(0, 0, W, H); ctx.restore();
+  ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(0, roll, W, 60 * k); ctx.fillStyle = 'rgba(0,0,0,.08)'; for (let y = 0; y < H; y += 4 * k) ctx.fillRect(0, y, W, 1.5 * k);
+  for (let i = 0; i < 4; i++) { ctx.fillStyle = `rgba(255,255,255,${.25 + rnd(i, seed) * .4})`; ctx.fillRect(0, H - (14 + rnd(i, seed + 1) * 30) * k, W * rnd(i, seed + 2), 2 * k); }
+  ctx.save(); ctx.font = `600 ${44 * k}px ui-monospace, Menlo, monospace`; ctx.fillStyle = '#f4f4f4'; ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 6 * k;
+  if (Math.floor(t * 1.2) % 2 === 0) ctx.fillText('PLAY ▶', 70 * k, 100 * k);
+  const ss = Math.floor(t) % 60, mm = Math.floor(t / 60); ctx.fillText(`SP  0:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`, 70 * k, H - 70 * k); ctx.restore();
+}
+function wobble(ctx, t) {                 // the whole frame melts in slow sine waves
+  const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, band = Math.max(2, Math.round(5 * k));
+  _layer.width = W; _layer.height = H; _layer.getContext('2d').drawImage(ctx.canvas, 0, 0);
+  for (let y = 0; y < H; y += band) ctx.drawImage(_layer, 0, y, W, band, Math.sin(y / k * .012 + t * 3.2) * 16 * k, y, W, band);
+}
+function sparkle(ctx, t) {                // foil glints twinkling around the frame
+  const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920;
+  ctx.save(); ctx.fillStyle = '#fff'; ctx.shadowColor = '#fff'; ctx.shadowBlur = 12 * k;
+  for (let i = 0; i < 18; i++) { const s2 = Math.max(0, Math.sin(t * 2.6 + i * 1.7)) * (10 + rnd(i, 4) * 16) * k; if (s2 < 1) continue;
+    const x = (.18 + rnd(i, 1) * .64) * W, y = (.08 + rnd(i, 2) * .8) * H; ctx.beginPath();
+    for (let j = 0; j < 8; j++) { const a = j / 8 * TAU, r = j % 2 ? s2 * .22 : s2; ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } ctx.fill(); }
+  ctx.restore();
 }
 
 /* ---------- score → keyframes ---------- */
@@ -647,6 +788,8 @@ const STYLE_SWATCHES = [
   { label:'Hologram gold', style:'hologram', color:'#ffd23a' }, { label:'Hologram green', style:'hologram', color:'#59ff8a' },
   { label:'Comic', style:'comic' }, { label:'Risograph', style:'riso' }, { label:'Sticker', style:'sticker' }, { label:'Chalkboard', style:'chalk' },
   { label:'8-bit', style:'pixel' }, { label:'Crayon', style:'crayon' }, { label:'Newsprint', style:'newsprint' }, { label:'Cut paper', style:'cutpaper' },
+  { label:'Pixel wind', style:'pixelwind' }, { label:'Pop burst', style:'pop' }, { label:'Holo foil', style:'foil' }, { label:'RGB glitch', style:'rgb' },
+  { label:'VHS', style:'vhs' }, { label:'Acid trip', style:'acid' }, { label:'Colour static', style:'static' },
 ];
 const SLIDERS = {
   Body:  [['squash','Squash', .8, 1.2, .01], ['tilt','Lean', -20, 20, .5], ['bounce','Bounce', 0, 20, .5], ['bx','Slide', -150, 150, 1], ['zoom','Camera zoom', .6, 1.6, .01]],

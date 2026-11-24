@@ -4,7 +4,7 @@ A code-driven character animation engine: **every frame is a pure function of `(
 
 - **Rig**: the character is a set of numbers (`eyeOpen`, `browInner`, `mouthCurve`, `rhY`, …), with no drawings. Because they're numbers, anything can tween into anything.
 - **Poses**: named partial parameter sets (`thinking`, `furious`, `laughing`, …).
-- **Styles**: renderers that draw the *same* rig geometry differently (`lineart`, `pencil`, `blueprint`, `comic`, `riso`, `sticker`, `chalk`, `pixel`, `crayon`, `newsprint`, `cutpaper`, `ink`, `hologram`, `paint`). Swapping a style doesn't touch the animation.
+- **Styles**: renderers that draw the *same* rig geometry differently (`lineart`, `pencil`, `blueprint`, `comic`, `riso`, `sticker`, `chalk`, `pixel`, `crayon`, `newsprint`, `cutpaper`, glitch styles `pixelwind`, `pop`, `foil`, `rgb`, `vhs`, `acid`, `static`, `ink`, `hologram`, `paint`). Swapping a style doesn't touch the animation.
 - **Characters**: `fridge` and `hashbrown` (a red-and-white Pembroke, modelled on his owner's ink drawing; standing 3/4 view). They read the same params, so every pose and style works on both. Switch with `{ at: [10, 1], character: 'hashbrown' }`. Characters can also use extra channels (Hashbrown uses `earL`, `earR`, `tailWag` and `tongue`), which other characters ignore.
 - **Score**: events in musical time, `{ at: [bar, beat], pose | style | set | talk }`, compiled to keyframes with an overshoot ease, plus always-on secondary motion (breathing, blinking, 12fps line "boil", lip flap).
 
