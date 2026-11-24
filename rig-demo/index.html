@@ -84,7 +84,7 @@
     <span id="clock">bar 1 · beat 1</span>
     <label class="lbl" for="bpm">BPM</label><input id="bpm" type="number" value="100" min="30" max="240">
     <label class="lbl" for="bpb">Beats/bar</label><input id="bpb" type="number" value="4" min="1" max="12">
-    <input id="audioFile" type="file" accept="audio/*" hidden>
+    <input id="audioFile" type="file" accept="audio/*,video/mp4,video/quicktime,.mp3,.m4a,.aac,.wav,.ogg,.oga,.flac,.mp4,.mov,.webm" hidden>
     <button id="loadSong">Load song</button>
     <input id="svgFile" type="file" accept=".svg,image/svg+xml" hidden>
   </header>
@@ -778,7 +778,16 @@ const $ = id => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d');
 const code = $('code'), hl = $('hl'), err = $('err'), bpmEl = $('bpm'), bpbEl = $('bpb'), scrub = $('scrub'), clock = $('clock');
 const playBtn = $('play'), modeEl = $('mode'), liveBtns = $('liveBtns'), addBtn = $('addBtn'), tabbody = $('tabbody');
-const audio = new Audio();
+// songs are decoded with Web Audio (no media URLs), so they play anywhere the page runs
+const song = { ac: null, buf: null, src: null, startAt: 0 };
+const songTime = () => song.ac.currentTime - song.startAt;
+function songStop() { if (song.src) { try { song.src.stop(); } catch (_) {} song.src.disconnect(); song.src = null; } }
+function songPlay(from) {
+  songStop(); if (song.ac.state === 'suspended') song.ac.resume();
+  const s = song.ac.createBufferSource(); s.buffer = song.buf; s.connect(song.ac.destination);
+  from = Math.max(0, Math.min(from, song.buf.duration - .01)); s.start(0, from); song.src = s; song.startAt = song.ac.currentTime - from;
+}
+const dur = () => hasAudio ? Math.max(C.duration, song.buf.duration) : C.duration;
 let C = compile([], 100, 4), lineOf = [], playing = true, t0 = performance.now() / 1000, tPaused = 0, hasAudio = false;
 let live = null, liveP = null, liveBase = null, tab = 'character', offline = false;
 
@@ -828,11 +837,11 @@ function insertEvent(at, ev) {
 }
 
 /* ----- time ----- */
-const now = () => hasAudio ? audio.currentTime : playing ? performance.now() / 1000 - t0 : tPaused;
-function seek(t) { t = Math.max(0, t); if (hasAudio) audio.currentTime = t; t0 = performance.now() / 1000 - t; tPaused = t; }
+const now = () => !playing ? tPaused : hasAudio && song.src ? songTime() : performance.now() / 1000 - t0;
+function seek(t) { t = Math.max(0, t); if (hasAudio && playing) songPlay(t); t0 = performance.now() / 1000 - t; tPaused = t; }
 function setPlaying(p) {
-  playing = p; playBtn.textContent = p ? 'Pause' : 'Play';
-  if (p) { live = null; seek(tPaused); hasAudio && audio.play(); } else { tPaused = now(); hasAudio && audio.pause(); }
+  const cur = now(); playing = p; playBtn.textContent = p ? 'Pause' : 'Play';
+  if (p) { live = null; seek(tPaused); } else { tPaused = cur; songStop(); }
   updateMode();
 }
 
@@ -927,7 +936,7 @@ function renderScoreAt(t) { const e = evaluate(C, t); drawCharacter(ctx, e.P, e.
 let fc = 0;
 function frame() {
   if (offline) return;
-  let t = now(); if (t > C.duration) { seek(0); t = 0; }
+  let t = now(); if (t > dur()) { seek(0); t = 0; }
   let shownP, idx = -1;
   if (live) {
     const tw = performance.now() / 1000, target = { ...BASE, ...POSES[live.pose], ...live.set };
@@ -941,7 +950,7 @@ function frame() {
   }
   const line = lineOf[idx]; hl.hidden = line == null || !!live;
   if (line != null) hl.style.top = (10 + line * 18 - code.scrollTop) + 'px';
-  scrub.value = Math.round(t / C.duration * 1000);
+  scrub.value = Math.round(t / dur() * 1000);
   const bb = barBeat(t, .01);
   clock.textContent = `bar ${bb[0]} · beat ${Math.floor(bb[1])}   ${t.toFixed(1)}s`;
   if (++fc % 6 === 0) {
@@ -954,9 +963,12 @@ function frame() {
 /* ----- wiring ----- */
 playBtn.onclick = () => setPlaying(!playing);
 $('restart').onclick = () => { live = null; seek(0); updateMode(); };
-scrub.oninput = () => { live = null; seek(scrub.value / 1000 * C.duration); updateMode(); };
+scrub.oninput = () => { live = null; seek(scrub.value / 1000 * dur()); updateMode(); };
 code.oninput = bpmEl.oninput = bpbEl.oninput = rebuild;
-$('loadSong').onclick = () => $('audioFile').click();
+$('loadSong').onclick = () => {   // create/unlock audio inside the tap itself so phones allow playback
+  try { song.ac = song.ac || new (window.AudioContext || window.webkitAudioContext)(); song.ac.resume(); } catch (_) {}
+  $('audioFile').click();
+};
 $('svgFile').onchange = async e => {
   const f = e.target.files[0]; if (!f) return; e.target.value = '';
   try {
@@ -965,7 +977,20 @@ $('svgFile').onchange = async e => {
     rebuild(); buildTab(); act({ character: name }, true);
   } catch (x) { err.textContent = x.message; }
 };
-$('audioFile').onchange = e => { const f = e.target.files[0]; if (!f) return; audio.src = URL.createObjectURL(f); hasAudio = true; seek(0); setPlaying(true); };
+$('audioFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  const btn = $('loadSong'); btn.textContent = 'Loading…'; err.textContent = '';
+  try {
+    if (!song.ac) song.ac = new (window.AudioContext || window.webkitAudioContext)();
+    const data = await f.arrayBuffer();
+    song.buf = await new Promise((ok, no) => { const r = song.ac.decodeAudioData(data, ok, no); if (r && r.then) r.then(ok, no); });
+    songStop(); hasAudio = true; btn.textContent = '♪ ' + (f.name.length > 22 ? f.name.slice(0, 20) + '…' : f.name);
+    playing = false; tPaused = 0; setPlaying(true);
+  } catch (x) {
+    btn.textContent = 'Load song';
+    err.textContent = `Couldn't play "${f.name}". Try an MP3, M4A/AAC or WAV file. Songs bought from Apple Music or Spotify are copy-protected and can't be loaded.`;
+  }
+};
 document.addEventListener('keydown', e => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); setPlaying(!playing); } });
 
 code.value = DEFAULT_SCORE; rebuild(); buildTab(); updateMode(); requestAnimationFrame(frame);
