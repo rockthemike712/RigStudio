@@ -78,7 +78,7 @@
 <div id="app">
   <header>
     <h1>Rig <span>Studio</span></h1>
-    <button id="play" class="primary">Pause</button>
+    <button id="play" class="primary">Play</button>
     <button id="restart" aria-label="Back to start">⟲</button>
     <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="Timeline">
     <span id="clock">bar 1 · beat 1</span>
@@ -788,7 +788,7 @@ function songPlay(from) {
   from = Math.max(0, Math.min(from, song.buf.duration - .01)); s.start(0, from); song.src = s; song.startAt = song.ac.currentTime - from;
 }
 const dur = () => hasAudio ? Math.max(C.duration, song.buf.duration) : C.duration;
-let C = compile([], 100, 4), lineOf = [], playing = true, t0 = performance.now() / 1000, tPaused = 0, hasAudio = false;
+let C = compile([], 100, 4), lineOf = [], playing = false, t0 = performance.now() / 1000, tPaused = 0, hasAudio = false;
 let live = null, liveP = null, liveBase = null, tab = 'character', offline = false;
 
 const STYLE_SWATCHES = [
