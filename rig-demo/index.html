@@ -148,6 +148,7 @@ const POSES = {
   sleepy:    { eyeOpen:.12, browY:-72, mouthCurve:2, mouthW:14, tilt:8, squash:.97, lhY:120, rhY:120, earL:-30, earR:30, tailWag:.15 },
 };
 
+const allFills = color => ({ body: color, side: color, dark: color, eyeWhite: color, hand: color, fur: color, white: color, pink: color, iris: color });
 const STYLES = {
   pencil:    { bg:'#efede6', ink:'rgba(38,38,44,.82)', w:2.3, jitter:2.4, passes:2, guides:'rgba(70,115,205,.32)', shadow:'rgba(0,0,0,.10)',
                fills:{ dark:'rgba(38,38,44,.85)', eyeWhite:'#efede6', iris:'rgba(38,38,44,.7)', fur:'BG', white:'BG', pink:'rgba(38,38,44,.12)' } },
@@ -159,6 +160,35 @@ const STYLES = {
                fills:{ dark:'INK', eyeWhite:'#05060b', iris:'INK', fur:'BG', white:'BG', pink:'BG' } },
   lineart:   { bg:'#f2eee6', ink:'#161514', w:2.5, jitter:.5, passes:1, shadow:'rgba(0,0,0,.07)',
                fills:{ dark:'#161514', eyeWhite:'#f2eee6', iris:'#161514', fur:'BG', white:'BG', pink:'BG', body:'BG', side:'BG', hand:'BG' } },
+  comic:     { bg:'#fff3c4', bgDots:'rgba(240,150,40,.22)', bgDotSize:18, ink:'#111111', w:6.5, jitter:0, passes:1, shadow:'rgba(0,0,0,.18)',
+               fills:{ body:'#ffffff', side:{ base:'#e8dfc8', dots:'rgba(0,0,0,.28)', size:9 }, dark:'#111111', eyeWhite:'#ffffff', hand:'#ffffff', iris:'#3b2412',
+                       fur:{ base:'#f08a2c', dots:'rgba(160,30,0,.45)', size:10 }, white:'#fffdf5', pink:'#ff7fa0' } },
+  riso:      { bg:'#f3eee4', ink:'#ff48b0', w:3, jitter:.8, passes:1, grain:.22, shadow:'#ffbfe2',
+               // each ink is printed as its own sheet (opaque within itself), then multiplied onto the paper
+               layers:[
+                 { comp:'multiply', fills:{ ...allFills('#ffffff'), fur:'#ffa6d6', pink:'#ff62bb', dark:'#ff48b0', iris:'#ff48b0', body:'#ffd3ea', hand:'#ffc0e2' } },
+                 { comp:'multiply', offset:[9, 5], ink:'#0078bf', shadow:null,
+                   fills:{ ...allFills('#ffffff'), fur:{ base:'#ffffff', dots:'#0078bf', size:9 }, dark:'#0078bf', iris:'#0078bf',
+                           side:{ base:'#ffffff', dots:'#0078bf', size:9 }, white:{ base:'#ffffff', dots:'rgba(0,120,191,.25)', size:9 } } } ] },
+  sticker:   { bg:'#dfe7ec', ink:'#1d1d1f', w:5, jitter:0, passes:1, shadow:null,
+               fills:{ body:'#ffffff', side:'#d8dde2', dark:'#1d1d1f', eyeWhite:'#ffffff', hand:'#ffd23a', iris:'#4a2b14', fur:'#ef8a35', white:'#ffffff', pink:'#ff8fab' },
+               layers:[ { ink:'#ffffff', w:34, fills:allFills('#ffffff'), shapeShadow:'rgba(20,40,60,.35)' }, {} ] },
+  chalk:     { bg:'#25332c', ink:'rgba(240,240,226,.82)', w:2.6, jitter:2.6, passes:3, shadow:'rgba(0,0,0,.25)',
+               fills:{ dark:'rgba(240,240,226,.85)', iris:'rgba(240,240,226,.85)', eyeWhite:'#25332c', fur:{ base:'#25332c', scribble:'rgba(246,168,104,.42)' },
+                       white:{ base:'#25332c', scribble:'rgba(240,240,226,.28)' }, pink:{ scribble:'rgba(255,160,182,.5)' }, body:{ base:'#25332c', scribble:'rgba(240,240,226,.16)' },
+                       side:{ base:'#25332c', scribble:'rgba(240,240,226,.1)' }, hand:{ base:'#25332c', scribble:'rgba(240,226,140,.4)' } } },
+  pixel:     { bg:'#9bbc0f', ink:'#0f380f', w:5, jitter:0, passes:1, pixel:11, shadow:'rgba(15,56,15,.25)',
+               fills:{ body:'#8bac0f', side:'#306230', dark:'#0f380f', eyeWhite:'#8bac0f', hand:'#8bac0f', iris:'#0f380f', fur:'#306230', white:'#8bac0f', pink:'#306230' } },
+  crayon:    { bg:'#fbf8f0', ink:'#3a2a1e', w:3.2, jitter:2, passes:2, grain:.14, shadow:'rgba(0,0,0,.08)',
+               fills:{ dark:'#3a2a1e', iris:'#3a2a1e', eyeWhite:'#fbf8f0', fur:{ base:'#fbf8f0', scribble:'rgba(234,118,38,.85)' }, white:{ base:'#fbf8f0', scribble:'rgba(190,190,176,.3)' },
+                       pink:{ scribble:'rgba(240,108,140,.85)' }, body:{ base:'#fbf8f0', scribble:'rgba(100,165,230,.75)' }, side:{ base:'#fbf8f0', scribble:'rgba(55,105,180,.75)' },
+                       hand:{ base:'#fbf8f0', scribble:'rgba(240,196,80,.85)' } } },
+  newsprint: { bg:'#ebe5d6', ink:'#1b1b1b', w:3, jitter:.6, passes:1, grain:.3, shadow:'rgba(0,0,0,.12)',
+               fills:{ dark:'#1b1b1b', iris:'#1b1b1b', eyeWhite:'#ebe5d6', fur:{ base:'#ebe5d6', dots:'rgba(20,20,20,.62)', size:8 }, white:'#ebe5d6',
+                       pink:{ base:'#ebe5d6', dots:'rgba(20,20,20,.28)', size:8 }, body:{ base:'#ebe5d6', dots:'rgba(20,20,20,.18)', size:8 },
+                       side:{ base:'#ebe5d6', dots:'rgba(20,20,20,.5)', size:8 }, hand:'#ebe5d6' } },
+  cutpaper:  { bg:'#e7dfcd', ink:'#2a2520', w:1.6, jitter:1.4, passes:1, grain:.12, shapeShadow:'rgba(70,45,20,.4)', shadow:'rgba(70,45,20,.18)',
+               fills:{ body:'#5aa1c9', side:'#3f7fa6', dark:'#2a2520', eyeWhite:'#fbf7ee', hand:'#f2c14e', iris:'#2a2520', fur:'#d9692b', white:'#fbf7ee', pink:'#f19aa8' } },
   paint:     { bg:'#f4efe4', ink:'#2b2118', w:4, jitter:1.1, passes:1, shadow:'rgba(60,40,20,.2)',
                fills:{ body:'PAINT', side:'rgba(60,90,60,.55)', dark:'#2b2118', eyeWhite:'#fff8ea', hand:'#e8a93a', iris:'#6b3a1a', fur:'PAINT_WARM', white:'#fff8ea', pink:'#e86a7e' } },
 };
@@ -228,20 +258,56 @@ function makePen(ctx, S, seed, t) {
     guide(pts, closed = false) { if (!S.guides) return; ctx.save(); ctx.strokeStyle = S.guides; ctx.lineWidth = 1.4; path(pts, closed, 7); ctx.stroke(); ctx.restore(); },
     fill(pts, role) {
       let c = S.fills && S.fills[role]; if (!c) return;
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (const [x, y] of pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      const m = ctx.getTransform(), px = Math.hypot(m.a, m.b) / (ctx.canvas.width / 1920);   // local units → 1920-wide screen px
       ctx.save(); path(pts, true, 0);
+      if (S.shapeShadow) { ctx.shadowColor = S.shapeShadow; ctx.shadowBlur = 12 / px; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; }
       if (c === 'INK') c = ink;
       if (c === 'BG') c = S.bg;
       if (c === 'PAINT' || c === 'PAINT_WARM') { // watercolour: clip, then lay blotches
         ctx.clip(); const cols = c === 'PAINT' ? ['#3d7bc7', '#4f9a4a', '#2f6fb0', '#79b04a', '#c9a227'] : ['#e0893a', '#c9662a', '#f0b25a', '#d9772f', '#b8542a'];
-        ctx.fillStyle = cols[2]; ctx.fill();
-        for (let i = 0; i < 14; i++) { const x = -110 + rnd(i, 3) * 230, y = -130 + rnd(i, 5) * 270, r = 60 + rnd(i, 7) * 90;
+        ctx.fillStyle = cols[2]; ctx.fill(); const w = x1 - x0, h = y1 - y0;
+        for (let i = 0; i < 14; i++) { const x = x0 + rnd(i, 3) * w, y = y0 + rnd(i, 5) * h, r = (.25 + rnd(i, 7) * .4) * Math.max(w, h);
           const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, cols[i % 5] + 'cc'); g.addColorStop(1, cols[i % 5] + '00');
           ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+      } else if (typeof c === 'object') {
+        if (c.base) { ctx.fillStyle = c.base === 'BG' ? S.bg : c.base; ctx.fill(); }
+        ctx.shadowColor = 'transparent'; ctx.clip();
+        if (c.dots) {                     // halftone / Ben-Day dots, screen-sized
+          const pat = ctx.createPattern(dotTile(c.dots, c.size || 9, ctx.canvas.width), 'repeat');
+          pat.setTransform(new DOMMatrix().scale(1 / Math.hypot(m.a, m.b)).rotate(c.angle ?? 15)); ctx.fillStyle = pat; ctx.fillRect(x0 - 50, y0 - 50, x1 - x0 + 100, y1 - y0 + 100);
+        }
+        if (c.scribble) {                 // crayon / chalk: jittery diagonal strokes that re-scribble on the boil
+          ctx.strokeStyle = c.scribble; ctx.lineWidth = (c.lw || 3.2) / px; ctx.lineCap = 'round';
+          const step = (c.step || 9) / px, h = y1 - y0;
+          for (let k = x0 - h, i = 0; k < x1; k += step, i++) { ctx.beginPath();
+            for (let j = 0; j <= 6; j++) { const u = j / 6, x = k + u * h + (rnd(i * 7 + j, seed) - .5) * step * .9, y = y1 - u * h + (rnd(i * 7 + j + 3, seed + 1) - .5) * step * .9; j ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+            ctx.stroke(); }
+        }
       } else { ctx.fillStyle = c; ctx.fill(); }
       ctx.restore();
     },
   };
 }
+
+
+/* ---------- textures shared by the styles ---------- */
+const _tiles = {};
+function dotTile(color, size, W) {           // one halftone cell, sized in screen pixels
+  const px = Math.max(3, Math.round(size * W / 1920)), key = color + px;
+  if (_tiles[key]) return _tiles[key];
+  const c = document.createElement('canvas'); c.width = c.height = px; const g = c.getContext('2d');
+  g.fillStyle = color; g.beginPath(); g.arc(px / 2, px / 2, px * .3, 0, TAU); g.fill();
+  return (_tiles[key] = c);
+}
+let _grain = null;
+function grainTile() {
+  if (_grain) return _grain;
+  const c = document.createElement('canvas'); c.width = c.height = 220; const g = c.getContext('2d'), im = g.createImageData(220, 220);
+  for (let i = 0; i < im.data.length; i += 4) { const v = 150 + Math.random() * 105; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; }
+  g.putImageData(im, 0, 0); return (_grain = c);
+}
+const _pix = document.createElement('canvas'), _layer = document.createElement('canvas');
 
 /* ---------- draw the rig ---------- */
 // Shared parts: any character can reuse these, so every pose works on every character.
@@ -502,24 +568,39 @@ path { stroke: #161514; stroke-width: 6; stroke-linecap: round; stroke-linejoin:
 CHARACTERS.hashbrown = makeSvgCharacter(parseSvgRig(HASHBROWN_SVG));
 
 function drawCharacter(ctx, P, S, t, who = 'fridge') {
-  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920;
   const seed = Math.floor(t * 12);               // "boil": redraw jitter 12×/sec like hand animation
-  const pen = makePen(ctx, S, seed, t);
   ctx.fillStyle = S.bg; ctx.fillRect(0, 0, W, H);
+  if (S.bgDots) { const pat = ctx.createPattern(dotTile(S.bgDots, S.bgDotSize || 16, W), 'repeat'); pat.setTransform(new DOMMatrix().rotate(20)); ctx.fillStyle = pat; ctx.fillRect(0, 0, W, H); }
 
-  ctx.save();
-  ctx.translate(W / 2 + P.camX, H / 2 - 20); ctx.scale(P.zoom * 1.9 * H / 1080, P.zoom * 1.9 * H / 1080);
-  // ground shadow / hologram pad
-  if (S.holo) { for (let i = 0; i < 3; i++) pen.stroke(ellipse(0, 215 + i * 6, 120 - i * 25, 22 - i * 4), true, .7); }
-  else { ctx.fillStyle = S.shadow; ctx.beginPath(); ctx.ellipse(0, 205, 150 * (2 - P.squash) * .9, 16, 0, 0, TAU); ctx.fill(); }
+  // a style can be several printed passes: misregistered riso inks, a sticker's white backing, etc.
+  const layers = S.layers ? S.layers.map(l => ({ ...S, ...l, layers: null })) : [S];
+  const main = ctx;
+  layers.forEach((L, li) => {
+    if (L.comp) { _layer.width = W; _layer.height = H; ctx = _layer.getContext('2d'); }   // draw the pass on its own sheet
+    const pen = makePen(ctx, L, seed + li * 5, t);
+    ctx.save();
+    if (L.offset) ctx.translate(L.offset[0] * k, L.offset[1] * k);
+    ctx.translate(W / 2 + P.camX, H / 2 - 20); ctx.scale(P.zoom * 1.9 * H / 1080, P.zoom * 1.9 * H / 1080);
+    if (li === 0) {   // ground shadow / hologram pad
+      if (L.holo) { for (let i = 0; i < 3; i++) pen.stroke(ellipse(0, 215 + i * 6, 120 - i * 25, 22 - i * 4), true, .7); }
+      else if (L.shadow) { ctx.fillStyle = L.shadow; ctx.beginPath(); ctx.ellipse(0, 205, 150 * (2 - P.squash) * .9, 16, 0, 0, TAU); ctx.fill(); }
+    }
+    const breathe = Math.sin(t * 2.2), bounce = -Math.abs(Math.sin(t * 9)) * P.bounce;
+    ctx.translate(P.bx, P.by + breathe * 3 + bounce + (L.holo ? Math.sin(t * 1.6) * 8 - 15 : 0));
+    ctx.rotate(P.tilt * Math.PI / 180);
+    CHARACTERS[who](ctx, pen, P, L, t, P.squash + breathe * .012);
+    ctx.restore();
+    if (L.comp) { ctx = main; ctx.save(); ctx.globalCompositeOperation = L.comp; ctx.drawImage(_layer, 0, 0); ctx.restore(); }
+  });
 
-  const breathe = Math.sin(t * 2.2);
-  const bounce = -Math.abs(Math.sin(t * 9)) * P.bounce;
-  ctx.translate(P.bx, P.by + breathe * 3 + bounce + (S.holo ? Math.sin(t * 1.6) * 8 - 15 : 0));
-  ctx.rotate(P.tilt * Math.PI / 180);
-  CHARACTERS[who](ctx, pen, P, S, t, P.squash + breathe * .012);
-  ctx.restore();
-
+  // post effects on the whole frame
+  if (S.pixel) {
+    const bw = Math.max(8, Math.round(W / (S.pixel * k))), bh = Math.max(5, Math.round(H / (S.pixel * k)));
+    _pix.width = bw; _pix.height = bh; _pix.getContext('2d').drawImage(ctx.canvas, 0, 0, bw, bh);
+    ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(_pix, 0, 0, bw, bh, 0, 0, W, H); ctx.restore();
+  }
+  if (S.grain) { ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = S.grain; ctx.fillStyle = ctx.createPattern(grainTile(), 'repeat'); ctx.fillRect(0, 0, W, H); ctx.restore(); }
   if (S.holo) { ctx.fillStyle = 'rgba(255,255,255,.035)'; for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 1); }
 }
 
@@ -564,6 +645,8 @@ const STYLE_SWATCHES = [
   { label:'Line art', style:'lineart' }, { label:'Pencil', style:'pencil' }, { label:'Blueprint', style:'blueprint' }, { label:'Ink', style:'ink' }, { label:'Paint', style:'paint' },
   { label:'Hologram pink', style:'hologram', color:'#ff4fd8' }, { label:'Hologram cyan', style:'hologram', color:'#39f3ff' },
   { label:'Hologram gold', style:'hologram', color:'#ffd23a' }, { label:'Hologram green', style:'hologram', color:'#59ff8a' },
+  { label:'Comic', style:'comic' }, { label:'Risograph', style:'riso' }, { label:'Sticker', style:'sticker' }, { label:'Chalkboard', style:'chalk' },
+  { label:'8-bit', style:'pixel' }, { label:'Crayon', style:'crayon' }, { label:'Newsprint', style:'newsprint' }, { label:'Cut paper', style:'cutpaper' },
 ];
 const SLIDERS = {
   Body:  [['squash','Squash', .8, 1.2, .01], ['tilt','Lean', -20, 20, .5], ['bounce','Bounce', 0, 20, .5], ['bx','Slide', -150, 150, 1], ['zoom','Camera zoom', .6, 1.6, .01]],
