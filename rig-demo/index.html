@@ -142,6 +142,7 @@ const POSES = {
   furious:   { eyeOpen:.7, eyeSize:17, browInner:22, browY:-70, mouthCurve:-12, mouthOpen:8, squash:.94, lhY:110, rhY:110, lhR:20, rhR:-20, earL:-30, earR:30, tailWag:0 },
   surprised: { eyeOpen:1.35, eyeSize:23, browY:-102, mouthOpen:22, mouthW:16, mouthCurve:0, squash:1.06, lhX:-175, lhY:-10, rhX:175, rhY:-10, earL:10, earR:-10 },
   sad:       { lookY:6, browInner:-14, browY:-74, mouthCurve:-14, mouthW:24, squash:.96, lhY:120, rhY:120, earL:-45, earR:45, tailWag:0 },
+  happy:     { eyeOpen:.85, mouthOpen:13, mouthCurve:16, mouthW:34, browY:-84, tongue:1, tailWag:2.2, earL:4, earR:-4 },
   sleepy:    { eyeOpen:.12, browY:-72, mouthCurve:2, mouthW:14, tilt:8, squash:.97, lhY:120, rhY:120, earL:-30, earR:30, tailWag:.15 },
 };
 
@@ -154,6 +155,8 @@ const STYLES = {
                fills:{ body:'#ffffff', side:'#e9e7e1', dark:'#141414', eyeWhite:'#ffffff', hand:'#ffffff', iris:'#6b3a1a', fur:'#e0843a', white:'#ffffff', pink:'#f48aa0' } },
   hologram:  { bg:'#05060b', ink:'#ff4fd8', w:3, jitter:.5, passes:1, glow:28, holo:true,
                fills:{ dark:'INK', eyeWhite:'#05060b', iris:'INK', fur:'BG', white:'BG', pink:'BG' } },
+  lineart:   { bg:'#f2eee6', ink:'#161514', w:2.5, jitter:.5, passes:1, shadow:'rgba(0,0,0,.07)',
+               fills:{ dark:'#161514', eyeWhite:'#f2eee6', iris:'#161514', fur:'BG', white:'BG', pink:'BG', body:'BG', side:'BG', hand:'BG' } },
   paint:     { bg:'#f4efe4', ink:'#2b2118', w:4, jitter:1.1, passes:1, shadow:'rgba(60,40,20,.2)',
                fills:{ body:'PAINT', side:'rgba(60,90,60,.55)', dark:'#2b2118', eyeWhite:'#fff8ea', hand:'#e8a93a', iris:'#6b3a1a', fur:'PAINT_WARM', white:'#fff8ea', pink:'#e86a7e' } },
 };
@@ -161,9 +164,10 @@ const STYLES = {
 
 const DEFAULT_SCORE = `[
   // bar 1 — the engine reads this like sheet music
-  { at: [1, 1], character: 'hashbrown', style: 'pencil', pose: 'neutral' },
+  { at: [1, 1], character: 'hashbrown', style: 'lineart', pose: 'happy' },
   { at: [1, 3], pose: 'waving' },
   { at: [2, 1], pose: 'smiling', talk: 2 },
+  { at: [2, 3], style: 'pencil' },
   { at: [2, 3], set: { lookX: 9, lookY: -5 } },
   // bar 3
   { at: [3, 1], pose: 'thinking' },
@@ -293,73 +297,94 @@ const CHARACTERS = {
     hand(P.lhX, P.lhY, P.lhR, 1, 0); hand(P.rhX, P.rhY, P.rhR, -1, P.wave);
   },
 
-  // Hashbrown: red & white Pembroke, modelled on the reference photos
+  // Hashbrown: modelled on the owner's ink drawing — 3/4 standing pose, body trailing to the right
   hashbrown(ctx, pen, P, S, t, sq) {
-    ctx.save(); squashAt(ctx, 190, sq);
-    // fluffy curled stub tail, peeking out behind the hip
-    ctx.save(); ctx.translate(96, 96); ctx.rotate((Math.sin(t * 15) * 22 * P.tailWag) * Math.PI / 180);
-    const tail = fluff(ellipse(16, -16, 30, 25, 30), 4, 9); pen.fill(tail, 'fur'); pen.stroke(tail, true, .9);
-    pen.stroke(quad([4, -6], [16, -34], [32, -14]), false, .5); ctx.restore();
-    // hind feet, body, big fluffy white bib
-    for (const s of [-1, 1]) { const f = ellipse(s * 90, 182, 30, 14, 24); pen.fill(f, 'white'); pen.stroke(f, true, .9); }
-    const body = ellipse(0, 124, 106, 72, 48); pen.fill(body, 'fur'); pen.stroke(body);
-    const bib = fluff(ellipse(0, 104, 80, 86, 54), 6, 11); pen.fill(bib, 'white'); pen.stroke(bib, true, .65);
-    for (const [x, y] of [[-30, 120], [-8, 150], [22, 128], [36, 160]]) pen.stroke(quad([x, y], [x + 4, y + 8], [x + 1, y + 16]), false, .4);
-    pen.guide([[0, -240], [0, 200]]); pen.guide([[-150, -56], [150, -56]]); pen.guide(ellipse(0, -45, 140, 120, 48), true);
+    const tick = (x, y, a, l, k = .42) => pen.stroke([[x, y], [x + Math.cos(a) * l, y + Math.sin(a) * l]], false, k);
+    const furEdge = (pts, every, len, from = 0, to = 1) => {     // little fur flicks along an outline
+      const n = pts.length, cx = pts.reduce((a, p) => a + p[0], 0) / n, cy = pts.reduce((a, p) => a + p[1], 0) / n;
+      for (let i = Math.floor(n * from); i < n * to; i += every) { const [x, y] = pts[i], a = Math.atan2(y - cy, x - cx);
+        tick(x - Math.cos(a) * len * 1.2, y - Math.sin(a) * len * 1.2, a + .5, len); }
+    };
+    ctx.save(); ctx.translate(-12, 0); ctx.translate(0, 190); ctx.scale(.86, .86); ctx.translate(0, -190); squashAt(ctx, 190, sq);
+
+    // curled fluffy tail sitting on top of the back
+    ctx.save(); ctx.translate(112, -18); ctx.rotate(Math.sin(t * 15) * 20 * P.tailWag * Math.PI / 180);
+    const tail = fluff(ellipse(18, -24, 30, 26, 30), 4, 10); pen.fill(tail, 'fur'); pen.stroke(tail, true, .9);
+    pen.stroke(quad([2, -18], [10, -44], [30, -36]), false, .5); ctx.restore();
+    // hind body + fluffy butt, and the one visible back leg
+    const hind = fluff(ellipse(62, 62, 108, 98, 60), 3.5, 18); pen.fill(hind, 'fur'); pen.stroke(hind); furEdge(hind, 4, 9, .0, .5);
+    const hl = rrect(112, 100, 42, 82, 18); pen.fill(hl, 'fur'); pen.stroke(hl, true, .9);
+    const hp = ellipse(136, 182, 26, 13, 22); pen.fill(hp, 'white'); pen.stroke(hp, true, .9);
+    pen.stroke([[128, 176], [128, 190]], false, .5); pen.stroke([[140, 176], [140, 190]], false, .5);
+
+    // front legs (driven by the rig's hand channels, so poses can lift a paw)
+    const leg = (bx, hx, hy, r, wave) => {
+      const x = bx + (hx - Math.sign(hx) * 160) * .2, y = (hy - 70) * .75, raised = hy < 40;
+      ctx.save(); ctx.translate(x, 140 + y); ctx.rotate((r * .6 + wave * Math.sin(t * 13) * 22) * Math.PI / 180);
+      const l = rrect(-20, -30, 40, 72, 16); pen.fill(l, 'white'); pen.stroke(l, true, .9);
+      const p = ellipse(-4, 46, 28, 14, 22); pen.fill(p, 'white'); pen.stroke(p, true, .9);
+      if (raised) { pen.fill(ellipse(-4, 46, 10, 7, 16), 'pink'); for (const bx2 of [-16, -4, 8]) pen.fill(ellipse(bx2, 38, 4.5, 4, 12), 'pink'); }
+      else for (const tx of [-14, -4, 6]) pen.stroke(quad([tx, 40], [tx + 1, 50], [tx, 58]), false, .55);
+      ctx.restore();
+    };
+    leg(-88, P.lhX, P.lhY, P.lhR, 0); leg(24, P.rhX, P.rhY, P.rhR, P.wave);
+
+    // big V-shaped chest ruff
+    const ruff = fluff(quad([-138, -30], [-156, 96], [-32, 168]).concat(quad([-32, 168], [84, 96], [80, -30])).concat(quad([80, -30], [-30, -58], [-138, -30])), 6, 26);
+    pen.fill(ruff, 'white'); pen.stroke(ruff, true, .85);
+    for (let i = 0; i < 26; i++) { const x = -120 + rnd(i, 11) * 180, y = 10 + rnd(i, 12) * 130; if (Math.abs(x + 30) < 130 - (y - 10) * .7) tick(x, y, Math.PI / 2 + (x + 30) * .006 + (rnd(i, 13) - .5) * .6, 12 + rnd(i, 14) * 8); }
+    pen.guide([[-30, -260], [-30, 200]]); pen.guide([[-170, -95], [130, -95]]);
 
     // head
-    ctx.save(); ctx.translate(0, Math.sin(t * 2.2 + 1) * 2);
-    const ear = (side, rot) => {   // tall, wide-based, slightly rounded tips; pink inside with white fluff
-      ctx.save(); ctx.translate(side * 58, -112); ctx.rotate((rot + side * 6) * Math.PI / 180); ctx.scale(-side, 1);
-      const outer = quad([-50, 40], [-92, -40], [-72, -120]).concat(quad([-72, -120], [-60, -146], [-36, -124])).concat(quad([-36, -124], [12, -70], [40, -4]));
-      const inner = quad([-34, 22], [-70, -36], [-60, -100]).concat(quad([-60, -100], [-52, -118], [-40, -102])).concat(quad([-40, -102], [0, -56], [20, -2]));
-      pen.fill(outer, 'fur'); pen.stroke(outer, true); pen.fill(inner, 'pink'); pen.stroke(inner, true, .55);
-      for (const [x, y, dx] of [[-30, 10, -6], [-18, 4, 0], [-6, 8, 6]]) pen.stroke(quad([x, y], [x + dx, y - 18], [x + dx * 1.6, y - 36]), false, .5, S.fills && S.fills.white && S.fills.white !== 'BG' ? '#ffffff' : undefined);
+    ctx.save(); ctx.translate(-30, -88 + Math.sin(t * 2.2 + 1) * 2);
+    const ear = (side, rot) => {   // tall, wide-based, rounded tips
+      ctx.save(); ctx.translate(side * 60, -72); ctx.rotate((rot + side * 4) * Math.PI / 180); ctx.scale(-side, 1);
+      const outer = quad([-36, 30], [-64, -60], [-44, -122]).concat(quad([-44, -122], [-28, -158], [-6, -120])).concat(quad([-8, -126], [20, -60], [34, -6]));
+      const inner = quad([-22, 12], [-46, -52], [-32, -112]).concat(quad([-32, -112], [-24, -124], [-14, -110])).concat(quad([-14, -110], [8, -56], [16, -4]));
+      pen.fill(outer, 'fur'); pen.stroke(outer, true); pen.fill(inner, 'pink'); pen.stroke(inner, true, .5);
+      for (const [x, y] of [[-24, -20], [-14, -46], [-30, -66]]) tick(x, y, -1.3, 14, .4);
       ctx.restore();
     };
     ear(-1, P.earL); ear(1, P.earR);
-    // fox-like head: flatter crown, wide fluffy cheeks, tapering to a narrower chin
-    const R = [quad([0, -134], [56, -138], [88, -108]), quad([88, -108], [128, -76], [134, -26]), quad([134, -26], [130, 28], [60, 58]), quad([60, 58], [26, 72], [0, 72])];
-    const half = R.flatMap((q, i) => i ? q.slice(1) : q), headPts = half.concat(half.slice(1, -1).reverse().map(([x, y]) => [-x, y]));
-    const head = fluff(headPts, 3, 16); pen.fill(head, 'fur'); pen.stroke(head);
-    // white mask: muzzle + lower cheeks, with the thin blaze running up the forehead
-    const mask = quad([-74, 8], [-60, 72], [0, 70]).concat(quad([0, 70], [60, 72], [74, 8])).concat(quad([74, 8], [40, -26], [0, -18])).concat(quad([0, -18], [-40, -26], [-74, 8]));
-    pen.fill(mask, 'white'); pen.stroke(mask, true, .65);
-    const blazeL = quad([-5, -144], [-6, -64], [-30, -20]), blazeR = quad([30, -20], [6, -64], [5, -144]);
-    pen.fill(blazeL.concat(blazeR), 'white'); pen.stroke(blazeL, false, .65); pen.stroke(blazeR, false, .65);
-    for (const s of [-1, 1]) pen.fill(ellipse(s * 86, -2, 16, 9, 18), 'pink');   // blush
-    drawEyes(ctx, pen, P, 0, -56, -28, .74, true);
-    // nose: wide black button with a shine
-    const nose = quad([-20, -6], [0, -22], [20, -6]).concat(quad([20, -6], [8, 12], [0, 11])).concat(quad([0, 11], [-8, 12], [-20, -6]));
-    pen.fill(nose, 'dark'); pen.stroke(nose, true, .8); pen.fill(ellipse(-6, -10, 6, 3.5, 12), 'eyeWhite');
-    // mouth: the classic corgi grin
-    const mw = P.mouthW * 1.05, my = 18, c = P.mouthCurve * .7;
-    pen.stroke([[0, 10], [0, my]], false, .9);
-    if (P.mouthOpen > 1.5) {
-      const top = quad([-mw, my + 2 - c * .4], [0, my - 2 + c * .3], [mw, my + 2 - c * .4]), lo = quad([mw, my + 2 - c * .4], [0, my + c + P.mouthOpen * 2.3], [-mw, my + 2 - c * .4]);
-      const shape = top.concat(lo); pen.fill(shape, 'dark');
-      ctx.save(); ctx.beginPath(); shape.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.clip();
-      const tg = ellipse(0, my + c * .6 + P.mouthOpen * 1.9, mw * .6, 12 + P.mouthOpen * .6, 26); pen.fill(tg, 'pink'); pen.stroke([[0, my + P.mouthOpen], [0, my + P.mouthOpen * 2.2]], false, .45); ctx.restore();
-      pen.stroke(shape, true, 1.1);
-    } else {
-      pen.stroke(quad([0, my], [-mw * .5, my + 7 + c], [-mw, my + 1 - c * .4]), false, 1.2);
-      pen.stroke(quad([0, my], [mw * .5, my + 7 + c], [mw, my + 1 - c * .4]), false, 1.2);
-      if (P.tongue > .05) { const tg = rrect(-11, my + 3, 22, 8 + P.tongue * 22, 11); pen.fill(tg, 'pink'); pen.stroke(tg, true, .8); pen.stroke([[0, my + 7], [0, my + 3 + P.tongue * 18]], false, .45); }
-    }
-    ctx.restore(); ctx.restore();
+    const HR = [quad([0, -100], [40, -104], [64, -92]), quad([64, -92], [92, -64], [100, -20]), quad([100, -20], [116, 30], [96, 62]), quad([96, 62], [56, 92], [0, 92])];
+    const half = HR.flatMap((q, i) => i ? q.slice(1) : q), head = fluff(half.concat(half.slice(1, -1).reverse().map(([x, y]) => [-x, y])), 3, 18);
+    pen.fill(head, 'fur'); pen.stroke(head); furEdge(head, 3, 8, .3, .7);
+    // white mask: narrow blaze widening into the muzzle and lower cheeks
+    const mask = quad([-6, -98], [-10, -40], [-26, -4]).concat(quad([-26, -4], [-74, 30], [-70, 62])).concat(quad([-70, 62], [0, 100], [70, 62]))
+      .concat(quad([70, 62], [74, 30], [26, -4])).concat(quad([26, -4], [10, -40], [6, -98]));
+    pen.fill(mask, 'white'); pen.stroke(quad([-6, -98], [-10, -40], [-26, -4]), false, .6); pen.stroke(quad([26, -4], [10, -40], [6, -98]), false, .6);
+    pen.stroke(quad([-26, -4], [-40, 14], [-34, 30]), false, .5); pen.stroke(quad([26, -4], [40, 14], [34, 30]), false, .5);   // muzzle sides
 
-    // front legs with white socks; a raised paw shows its pink toe beans
-    const leg = (hx, hy, r, wave) => {
-      const x = hx * .4, y = 165 + (hy - 70) * .75, raised = hy < 40;
-      ctx.save(); ctx.translate(x, y - 40); ctx.rotate((r * .6 + wave * Math.sin(t * 13) * 22) * Math.PI / 180); ctx.translate(0, 40);
-      const l = rrect(-20, -55, 40, 72, 18); pen.fill(l, 'fur'); pen.stroke(l, true, .9);
-      const sock = rrect(-20, -14, 40, 31, 15); pen.fill(sock, 'white'); pen.stroke(sock, true, .6);
-      const toes = ellipse(0, 10, 22, 13, 22); pen.fill(toes, 'white'); pen.stroke(toes, true, .9);
-      if (raised) { pen.fill(ellipse(0, 10, 9, 7, 16), 'pink'); for (const bx of [-12, 0, 12]) pen.fill(ellipse(bx, bx ? 1 : -1, 4.5, 4, 12), 'pink'); }
-      else { pen.stroke([[-7, 2], [-7, 18]], false, .5); pen.stroke([[7, 2], [7, 18]], false, .5); }
-      ctx.restore();
-    };
-    leg(P.lhX, P.lhY, P.lhR, 0); leg(P.rhX, P.rhY, P.rhR, P.wave);
+    // eyes: small, dark and round with a shine; smile crinkles when happy
+    for (const side of [-1, 1]) {
+      const ex = side * (P.eyeGap - 4) + P.lookX * .6, ey = -24 + P.lookY * .5, rx = P.eyeSize * .55, ry = rx * Math.min(1.25, P.eyeOpen);
+      if (P.eyeOpen < .2) pen.stroke(quad([ex - rx * 1.3, ey], [ex, ey + 7], [ex + rx * 1.3, ey]), false, 1.2);
+      else { const e = ellipse(ex, ey, rx, ry, 24); pen.fill(e, 'iris'); pen.stroke(e, true, .9); pen.fill(ellipse(ex + rx * .3, ey - ry * .35, rx * .3, rx * .3, 12), 'eyeWhite'); }
+      pen.stroke(quad([ex - side * rx * 1.6, ey - ry - 2], [ex, ey - ry - 9], [ex + side * rx * 1.7, ey - ry + 2]), false, .55);          // lid
+      if (P.mouthCurve > 6) pen.stroke(quad([ex + side * rx * 1.2, ey + ry + 3], [ex + side * rx * 2.2, ey + 2], [ex + side * rx * 2.4, ey - 4]), false, .45);  // crinkle
+      const by = ey - 22 + (P.browY + 78) * .6, inner = ex - side * 6, outer = ex + side * 12;
+      pen.stroke(quad([inner, by + P.browInner * .6 + side * P.browTilt * .3], [ex + side * 3, by - 4], [outer, by - P.browInner * .25 - side * P.browTilt * .3]), false, 1.1 * P.browW);
+    }
+    // nose with nostrils, then the philtrum line
+    const nose = quad([-18, 16], [-20, 2], [0, 4]).concat(quad([0, 4], [20, 2], [18, 16])).concat(quad([18, 16], [10, 32], [0, 32])).concat(quad([0, 32], [-10, 32], [-18, 16]));
+    pen.fill(nose, 'dark'); pen.stroke(nose, true, .9); pen.fill(ellipse(-6, 10, 5, 3, 10), 'eyeWhite');
+    pen.stroke([[0, 32], [0, 42]], false, .8);
+    // mouth: corners rise with mouthCurve; opens into the big grin with tongue
+    const mw = P.mouthW * 1.5, c = P.mouthCurve, cl = [-mw, 40 - c * .7], cr = [mw, 40 - c * .7];
+    if (P.mouthOpen > 1.5) {
+      const top = quad(cl, [0, 44 + c * .2], cr), lo = quad(cr, [0, 46 + P.mouthOpen * 2.6 + c * .6], cl), shape = top.concat(lo);
+      pen.fill(shape, 'dark');
+      ctx.save(); ctx.beginPath(); shape.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.clip();
+      const bottom = .5 * (40 - c * .7) + .5 * (46 + P.mouthOpen * 2.6 + c * .6), ty = bottom - 2, tg = ellipse(0, ty, mw * .5, 7 + P.mouthOpen * .45, 26);
+      pen.fill(tg, 'pink'); pen.stroke(tg, true, .7); pen.stroke([[0, ty - 6], [0, ty + 3]], false, .5); ctx.restore();
+      pen.stroke(shape, true, 1.15);
+    } else {
+      pen.stroke(quad([0, 42], [-mw * .5, 50 + c * .4], cl), false, 1.15); pen.stroke(quad([0, 42], [mw * .5, 50 + c * .4], cr), false, 1.15);
+      if (P.tongue > .05) { const tg = rrect(-11, 45, 22, 8 + P.tongue * 22, 11); pen.fill(tg, 'pink'); pen.stroke(tg, true, .8); pen.stroke([[0, 49], [0, 45 + P.tongue * 18]], false, .45); }
+    }
+    if (c > 6) for (const s of [-1, 1]) pen.stroke(quad([s * (mw + 2), 36 - c * .7], [s * (mw + 8), 40 - c * .5], [s * (mw + 6), 48 - c * .4]), false, .5);  // cheek dimples
+    for (const s of [-1, 1]) pen.fill(ellipse(s * 72, 16, 14, 8, 16), 'pink');
+    ctx.restore(); ctx.restore();
   },
 };
 
@@ -423,7 +448,7 @@ let C = compile([], 100, 4), lineOf = [], playing = true, t0 = performance.now()
 let live = null, liveP = null, liveBase = null, tab = 'character', offline = false;
 
 const STYLE_SWATCHES = [
-  { label:'Pencil', style:'pencil' }, { label:'Blueprint', style:'blueprint' }, { label:'Ink', style:'ink' }, { label:'Paint', style:'paint' },
+  { label:'Line art', style:'lineart' }, { label:'Pencil', style:'pencil' }, { label:'Blueprint', style:'blueprint' }, { label:'Ink', style:'ink' }, { label:'Paint', style:'paint' },
   { label:'Hologram pink', style:'hologram', color:'#ff4fd8' }, { label:'Hologram cyan', style:'hologram', color:'#39f3ff' },
   { label:'Hologram gold', style:'hologram', color:'#ffd23a' }, { label:'Hologram green', style:'hologram', color:'#59ff8a' },
 ];
