@@ -70,7 +70,12 @@
     html, body { height:auto; }
     #app { height:auto; }
     main { grid-template-columns:minmax(0, 1fr); }
-    #stage { order:1; } #panelPane { order:2; min-height:420px; }
+    /* the stage pins to the top while you scroll through styles and poses, so every tap is visible */
+    #stage { order:1; position:sticky; top:env(safe-area-inset-top, 0px); z-index:5; background:var(--bg); padding-block:6px; box-shadow:0 10px 14px -10px rgba(0,0,0,.7); }
+    body::before { content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top, 0px); z-index:10; background:var(--bg); }
+    #panelPane { order:2; min-height:420px; overflow:visible; }
+    /* preview buttons stay in reach at the bottom of the screen */
+    #deck { position:sticky; bottom:env(safe-area-inset-bottom, 0px); z-index:4; background:var(--panel); border-radius:0 0 10px 10px; }
     #scriptPane { order:3; grid-column:auto; grid-row:auto; min-height:320px; }
     #clock { min-width:0; }
   }
