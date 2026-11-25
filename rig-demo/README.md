@@ -34,7 +34,10 @@ A code-driven character animation engine: **every frame is a pure function of `(
   - Rooms: `kitchen`, `living`, `stage`, `street`, `park`, `space`, and `none` (the style's own background).
   - Each room is a paper diorama: floor and walls in real perspective, 3D boxes for furniture and buildings, and flat cut-outs standing at different depths. It's drawn with the style's own pen, so every room works in every style. Room surfaces use each style's flat colours rather than its full texture (crayon scribble over a whole wall costs ~100 ms a frame), and far layers are veiled so the character stays in front.
   - Camera moves: `move: 'push' | 'pull' | 'pan' | 'orbit' | 'drift' | 'sweep' | 'still'` (or `camera: 'orbit'`). A move runs over two bars and eases in from the last one. Near layers slide further than far ones, boxes show their sides, and orbiting turns Doug for real (Hashbrown, a flat drawing, turns a little). Push-ins on top of close-ups are capped so the camera never ends up inside the character.
-  - The camera is also three rig values, `dolly`, `pan` and `orbit` (Design tab → Camera), so `set` works on them too.
+  - The camera is also rig values: `dolly`, `pan`, `orbit` and `dof` (depth blur) in Design → Camera, so `set` works on them too.
+  - **Depth of field:** the far layers and the things in front of the character are softly out of focus. Each blurred layer is drawn at half size and only the area it covers is scaled, so the kitchen costs about 2 ms more and the park, whose far layer spans the frame, about 12 ms (in a software-rendered test browser). `set: { dof: 0 }` turns it off.
+  - **Things in front:** each room has a prop between the camera and the character, at the edge of the frame: a kitchen chair, an armchair, the crowd's heads at the stage, a bin, a bush, a moon rock. They slide past fastest when the camera moves.
+  - **Lighting:** `light: 'auto' | 'day' | 'sunset' | 'night' | 'stage' | 'neon' | 'none'` is its own track. It falls on the room and the character together. `auto` (the default) uses the room's own light: daylight in the kitchen and living room, a spotlight on stage, night on the street and in space, sunset in the park. Dark-background styles get a lighter touch.
   - Room tab: tap a room or a move to preview it, then Add. Auto-animate gives the star a home room (kitchen for Doug's family, living room for Hashbrown's), moves somewhere else for big sections, and picks a shot and a move per section. Untick "Rooms" to keep the style backgrounds.
 - **Score**: events in musical time, `{ at: [bar, beat], pose | style | set | talk }`, compiled to keyframes with an overshoot ease, plus always-on secondary motion (breathing, blinking, 12fps line "boil", lip flap).
 
@@ -91,7 +94,13 @@ This steps time frame by frame in headless Chromium and pipes the frames to ffmp
 
 ## Extending
 - New expression: add an entry to `POSES`.
-- New room: add a function to `ROOMS` and list it in `ROOM_LIST`. It gets a helper `R` with `walls`, `plane`, `tint`, `line`, `rect`, `box` (real 3D, back faces culled) and `card` (a cut-out at a depth). Units match the character; `y` is up from the floor (negative), `z` is depth away from the camera.
+- **Your own room from art:** "Import SVG room…" in the Room tab, or see `rooms/bedroom.svg`. The format:
+  - `viewBox="0 0 1920 1080"`, drawn as seen with the camera at rest.
+  - One `<g data-depth="…">` per paper layer: `0` is where the character stands, bigger numbers are further back (a back wall is around 900, a skyline 2000+), negative numbers are in front of the character (around -250).
+  - The character stands in the middle with its feet at y ≈ 905. Keep x 700–1220, y 250–905 clear, except for low things on the floor.
+  - Fills by class follow the style: `fur`, `white`, `pink`, `dark`, `side`. Plain colours also work; they're matched to the nearest role by how light they are. Shapes with no fill are line work.
+  - A prompt for an image AI: *"Write an SVG (viewBox 0 0 1920 1080) of a [cosy bedroom], flat cartoon style, plain shapes only (rect, circle, ellipse, polygon, path), no gradients, text or images. Split it into layers as `<g data-depth="N">`: the back wall at 900, furniture at 300–500, a rug on the floor at 40, and one prop poking in from a corner at -250. Leave the middle (x 700–1220, y 250–905) empty for a character who stands with feet at y 905. Give each filled shape class="white", "side", "fur", "pink" or "dark"."*
+- New room in code: add a function to `ROOMS` and list it in `ROOM_LIST`. It gets a helper `R` with `walls`, `plane`, `tint`, `line`, `rect`, `box` (real 3D, back faces culled) and `card` (a cut-out at a depth). Units match the character; `y` is up from the floor (negative), `z` is depth away from the camera.
 - New look: add an entry to `STYLES`. A style sets:
   - lines: colour, weight, jitter, passes, glow
   - fills per role: flat colour, `grad`, `hatch`, `dots`, `scribble`, `stripes`, `spray`, `foil`, `rainbow` or `noise`
