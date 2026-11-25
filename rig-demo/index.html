@@ -131,6 +131,7 @@
         <div class="row" id="liveBtns" hidden>
           <button id="addBtn" class="primary">Add to script</button>
           <button id="discardBtn">Back to script</button>
+          <button id="wholeBtn" hidden>Use for whole song</button>
         </div>
       </div>
     </section>
@@ -1518,6 +1519,9 @@ function compile(score, bpm, bpb, offset = 0) {
   const spb = 60 / bpm, beatTime = ([bar, beat]) => offset + ((bar - 1) * bpb + (beat - 1)) * spb;
   const ev = score.map((e, idx) => ({ ...e, idx, t: beatTime(e.at) })).sort((a, b) => a.t - b.t || a.idx - b.idx);
   let pose = 'neutral', set = {}, cam = {}, grid = 1, style = 'lineart', color = null, color2 = null, character = 'hashbrown';
+  for (const e of ev.filter(q => q.t === (ev[0] && ev[0].t))) {   // what the script opens with also covers any lead-in before its first beat
+    const w = e.who || e.preset || e.character || e.create; if (w && CHARACTERS[w === 'doug' ? 'fridge' : w]) character = w === 'doug' ? 'fridge' : w;
+    const st = e.style && (STYLE_ALIASES[e.style] || e.style); if (st && STYLES[st]) style = st; }
   const keys = [{ t: 0, params: { ...BASE }, style, color, color2, character, grid, pose: 'neutral', idx: -1 }], talks = [];
   const names = o => Object.keys(o).join(', ');
   for (const e of ev) {
@@ -1839,6 +1843,14 @@ addBtn.onclick = () => {
   insertEvent(barBeat(now(), 1), d); live = null;
   stepBeats(1);   // move on a beat, so the next change lands after this one
 };
+// one character for the whole song: drop every character switch from the script and set the pick at the start
+function useCharacterForSong(who) {
+  let src = code.value.replace(/\b(character|who|preset|create)\s*:\s*('[^']*'|"[^"]*"|\w+)\s*,?\s*/g, '');
+  src = src.split('\n').filter(l => !/^\s*\{\s*at:\s*\[[^\]]*\],?\s*\},?\s*$/.test(l)).join('\n');   // lines left with nothing but a time
+  const open = src.indexOf('['); code.value = src.slice(0, open + 1) + `\n  { at: [1, 1], character: '${who}' },` + src.slice(open + 1);
+  rebuild();
+}
+$('wholeBtn').onclick = () => { if (!live) return; useCharacterForSong(live.character); live = null; updateMode(); refreshThumbs(true); };
 $('discardBtn').onclick = () => { live = null; updateMode(); refreshThumbs(true); };
 let flashUntil = 0;
 function flashMode() { flashUntil = performance.now() + 700; updateMode(); setTimeout(updateMode, 720); }
@@ -1850,6 +1862,7 @@ function updateMode() {
   else modeEl.innerHTML = `<b>Paused</b> at bar ${at[0]}, beat ${at[1]} · click anything to preview it`;
   liveBtns.hidden = !live;
   if (live) addBtn.textContent = `Add at bar ${at[0]}, beat ${at[1]}`;
+  $('wholeBtn').hidden = !live || live.character === liveBase.character;
   $('posRow').hidden = playing; const pb = barBeat(now(), 1); $('barOut').textContent = pb[0]; $('beatOut').textContent = Math.round(pb[1]);
 }
 
@@ -1976,7 +1989,11 @@ $('audioFile').onchange = async e => {
     song.buf = await new Promise((ok, no) => { const r = song.ac.decodeAudioData(data, ok, no); if (r && r.then) r.then(ok, no); });
     songStop(); setPlaying(false); btn.textContent = 'Listening…';
     song.an = await analyseSong(song.buf, q => { btn.textContent = `Listening… ${Math.round(q * 100)}%`; }); song.name = f.name.replace(/\.[^.]+$/, '');
-    hasAudio = true; bpmEl.value = song.an.bpm; bpbEl.value = 4; rebuild();
+    hasAudio = true; bpmEl.value = song.an.bpm; bpbEl.value = 4;
+    if (code.value.trim() === DEFAULT_SCORE.trim()) {   // the demo switches characters on purpose; a song gets a clean start instead
+      const L = look(); code.value = `[\n  // "${song.name}": tap poses and styles while it plays to write them in, or press ✨ Auto-animate\n  { at: [1, 1], character: '${L.who}', style: '${L.style}', pose: 'happy' },\n]`;
+    }
+    rebuild();
     btn.textContent = '♪ ' + (f.name.length > 22 ? f.name.slice(0, 20) + '…' : f.name);
     $('songInfo').textContent = `${song.an.bpm} BPM · first beat ${song.an.firstBeat.toFixed(2)}s` + (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? ' · no sound? turn off silent mode' : '');
     for (const id of ['songInfo', 'autoBtn', 'listenBtn', 'meter', 'lipLbl', 'lipSens']) $(id).hidden = false;
