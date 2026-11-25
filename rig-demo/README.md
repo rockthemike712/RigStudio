@@ -37,7 +37,19 @@ With "Listening: on", the character reacts to the song:
 
 "✨ Auto-animate" writes a whole script from the song's structure. It picks calmer styles and poses for quiet sections and glitch styles for big ones, changing on 4-bar boundaries.
 
-The lip sync is based on loudness, not on the words: it doesn't recognise lyrics.
+**Lip sync** tells words apart from instruments. It doesn't transcribe lyrics. Instead, every 20 ms it measures:
+- how centred the sound is (voices sit in the middle of the mix; stereo guitars and hats don't)
+- how strongly pitched it is
+- how much the pitch glides (voices slide; instruments hold notes)
+- how often pitched sound switches on and off (consonants interrupt words)
+
+A section of about 0.8 s is treated as words when there's enough evidence. Within words, the mouth follows each syllable. Vowel colour sets the shape: wide for "ee"/"a", round for "oo"/"o".
+
+The **Lip sync** slider sets how readily sound counts as words. On a test song with spoken words, a centred synth solo, stereo guitars and drums:
+- the accuracy score (F1) went from 0.39 to 0.74
+- mouth movement during the synth solo went from 84% of the time to 1–2%
+
+What the detector can still mistake for a voice is a centred lead instrument that slides between notes, like a slide guitar or a theremin.
 
 ## Frame-exact export
 ```bash
