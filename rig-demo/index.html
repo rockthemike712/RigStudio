@@ -30,6 +30,8 @@
   input[type=number] { width:62px; padding:6px 8px; }
   .lbl { color:var(--dim); font-size:12px; }
   #scrub { flex:1 1 160px; min-width:120px; accent-color:var(--accent); }
+  #meter { width:60px; height:16px; border-radius:3px; background:var(--raised); }
+  #listenBtn[aria-pressed=false] { color:var(--dim); }
   #clock { font:12px var(--mono); color:var(--dim); min-width:150px; font-variant-numeric:tabular-nums; }
   main { display:grid; grid-template-columns:minmax(260px, 30%) minmax(0, 1fr) 330px; gap:10px; min-height:0; }
   .pane { background:var(--panel); border:1px solid var(--line); border-radius:10px; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
@@ -68,7 +70,12 @@
     html, body { height:auto; }
     #app { height:auto; }
     main { grid-template-columns:minmax(0, 1fr); }
-    #stage { order:1; } #panelPane { order:2; min-height:420px; }
+    /* the stage pins to the top while you scroll through styles and poses, so every tap is visible */
+    #stage { order:1; position:sticky; top:env(safe-area-inset-top, 0px); z-index:5; background:var(--bg); padding-block:6px; box-shadow:0 10px 14px -10px rgba(0,0,0,.7); }
+    body::before { content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top, 0px); z-index:10; background:var(--bg); }
+    #panelPane { order:2; min-height:420px; overflow:visible; }
+    /* preview buttons stay in reach at the bottom of the screen */
+    #deck { position:sticky; bottom:env(safe-area-inset-bottom, 0px); z-index:4; background:var(--panel); border-radius:0 0 10px 10px; }
     #scriptPane { order:3; grid-column:auto; grid-row:auto; min-height:320px; }
     #clock { min-width:0; }
   }
@@ -78,14 +85,18 @@
 <div id="app">
   <header>
     <h1>Rig <span>Studio</span></h1>
-    <button id="play" class="primary">Pause</button>
+    <button id="play" class="primary">Play</button>
     <button id="restart" aria-label="Back to start">⟲</button>
     <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="Timeline">
     <span id="clock">bar 1 · beat 1</span>
-    <label class="lbl" for="bpm">BPM</label><input id="bpm" type="number" value="100" min="30" max="240">
+    <label class="lbl" for="bpm">BPM</label><input id="bpm" type="number" value="100" min="30" max="240" step="0.1">
     <label class="lbl" for="bpb">Beats/bar</label><input id="bpb" type="number" value="4" min="1" max="12">
     <input id="audioFile" type="file" accept="audio/*,video/mp4,video/quicktime,.mp3,.m4a,.aac,.wav,.ogg,.oga,.flac,.mp4,.mov,.webm" hidden>
     <button id="loadSong">Load song</button>
+    <canvas id="meter" width="120" height="32" hidden aria-label="What the character hears: vocals and beat"></canvas>
+    <span id="songInfo" class="lbl" hidden></span>
+    <button id="autoBtn" hidden>✨ Auto-animate</button>
+    <button id="listenBtn" hidden aria-pressed="true">Listening: on</button>
     <input id="svgFile" type="file" accept=".svg,image/svg+xml" hidden>
   </header>
   <main>
@@ -747,10 +758,10 @@ function sparkle(ctx, t) {                // foil glints twinkling around the fr
 
 /* ---------- score → keyframes ---------- */
 const ease = x => { const c1 = 1.70158, c3 = c1 + 1; return x >= 1 ? 1 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); }; // overshoot = cartoon snap
-function compile(score, bpm, bpb) {
-  const spb = 60 / bpm, beatTime = ([bar, beat]) => ((bar - 1) * bpb + (beat - 1)) * spb;
+function compile(score, bpm, bpb, offset = 0) {
+  const spb = 60 / bpm, beatTime = ([bar, beat]) => offset + ((bar - 1) * bpb + (beat - 1)) * spb;
   const ev = score.map((e, idx) => ({ ...e, idx, t: beatTime(e.at) })).sort((a, b) => a.t - b.t || a.idx - b.idx);
-  let pose = 'neutral', set = {}, style = 'pencil', color = null, character = 'fridge';
+  let pose = 'neutral', set = {}, style = 'lineart', color = null, character = 'hashbrown';
   const keys = [{ t: 0, params: { ...BASE }, style, color, character, pose: 'neutral', idx: -1 }], talks = [];
   for (const e of ev) {
     if (e.pose) { if (!POSES[e.pose]) throw new Error(`unknown pose '${e.pose}' — try: ${Object.keys(POSES).join(', ')}`); pose = e.pose; set = {}; }
@@ -788,7 +799,94 @@ function songPlay(from) {
   from = Math.max(0, Math.min(from, song.buf.duration - .01)); s.start(0, from); song.src = s; song.startAt = song.ac.currentTime - from;
 }
 const dur = () => hasAudio ? Math.max(C.duration, song.buf.duration) : C.duration;
-let C = compile([], 100, 4), lineOf = [], playing = true, t0 = performance.now() / 1000, tPaused = 0, hasAudio = false;
+const beatOffset = () => hasAudio && song.an ? song.an.firstBeat : 0;
+let listening = true;
+
+/* ----- listening: analyse the song once (offline, so playback, scrubbing and export all agree) ----- */
+async function analyseSong(buf) {
+  const sr = 22050, hop = 220, rate = sr / hop, len = Math.ceil(buf.duration * sr);
+  const band = async filters => {
+    const oc = new OfflineAudioContext(1, len, sr), src = oc.createBufferSource(); src.buffer = buf; let node = src;
+    for (const [type, f] of filters) { const b = oc.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = .7; node.connect(b); node = b; }
+    node.connect(oc.destination); src.start(); return (await oc.startRendering()).getChannelData(0);
+  };
+  const [vox, bass, full] = await Promise.all([band([['highpass', 300], ['lowpass', 3400]]), band([['lowpass', 140]]), band([])]);
+  const env = x => { const n = Math.floor(x.length / hop), out = new Float32Array(n);
+    for (let i = 0; i < n; i++) { let a = 0; const s0 = i * hop; for (let j = 0; j < hop; j++) { const v = x[s0 + j]; a += v * v; } out[i] = Math.sqrt(a / hop) || 0; } return out; };
+  const pct = (a, q) => { const c = Float32Array.from(a).sort(); return c[Math.floor(q * (c.length - 1))] || 1e-6; };
+  const norm = (a, floorQ = 0) => { const hi = pct(a, .95), lo = floorQ ? pct(a, floorQ) : 0; return a.map(v => Math.max(0, Math.min(1, (v - lo) / Math.max(1e-6, hi - lo)))); };
+  const V = norm(env(vox), .35), B = norm(env(bass)), E = norm(env(full));
+  // tempo: autocorrelate an onset curve; prefer 85–150 BPM
+  const n = E.length, on = new Float32Array(n);
+  for (let i = 1; i < n; i++) on[i] = .5 * Math.max(0, E[i] - E[i - 1]) + 1.5 * Math.max(0, B[i] - B[i - 1]);   // the kick defines the beat
+  let best = 100, bestScore = -1;
+  for (let bpm = 70; bpm <= 180; bpm += .5) {
+    const lag = 60 * rate / bpm; let sc = 0;
+    for (let i = 0; i + lag * 2 < n; i += 2) sc += on[i] * (on[Math.round(i + lag)] + .5 * on[Math.round(i + lag * 2)]);
+    sc *= Math.exp(-Math.pow((bpm - 118) / 55, 2));
+    if (sc > bestScore) { bestScore = sc; best = bpm; }
+  }
+  // refine tempo and phase together: the exact beat grid that lands on the most onsets across the whole song
+  const hit = j => { j = Math.round(j); return (on[j] || 0) + .5 * ((on[j - 1] || 0) + (on[j + 1] || 0)); };
+  let off = 0, offScore = -1, fine = best;
+  for (let bpm = best - 1.5; bpm <= best + 1.5; bpm += .02) {
+    const p2 = 60 * rate / bpm;
+    for (let o = 0; o < p2; o += .5) { let sc = 0; for (let k = o; k < n; k += p2) sc += hit(k); if (sc > offScore) { offScore = sc; off = o; fine = bpm; } }
+  }
+  best = Math.round(fine * 100) / 100;
+  const per = 60 * rate / best;
+  let down = 0, downScore = -1;
+  for (let d = 0; d < 4; d++) { let sc = 0; for (let k = off + d * per; k < n; k += per * 4) sc += B[Math.round(k)]; if (sc > downScore) { downScore = sc; down = d; } }
+  return { rate, vocal: V, bass: B, energy: E, bpm: best, firstBeat: (off + down * per) / rate, duration: buf.duration };
+}
+const sampleAt = (a, t, rate) => { const x = t * rate, i = Math.floor(x); if (i < 0 || i + 1 >= a.length) return 0; return a[i] + (a[i + 1] - a[i]) * (x - i); };
+function react(P, t) {   // the character responds to what it hears: lips follow vocals, body hits the beat
+  const A = song.an; if (!A || !listening || !hasAudio) return P;
+  const v = sampleAt(A.vocal, t, A.rate), b = sampleAt(A.bass, t, A.rate), e = sampleAt(A.energy, t, A.rate);
+  const spb2 = 60 / A.bpm; let ph = ((t - A.firstBeat) / spb2) % 1; if (ph < 0) ph += 1;
+  const pulse = Math.exp(-ph * 7) * (.35 + .65 * b);
+  P = { ...P };
+  if (v > .12) { P.mouthOpen = Math.max(P.mouthOpen, v * 22); P.mouthW *= .92; }
+  P.squash -= pulse * .07; P.by += pulse * 9; P.earL -= pulse * 9; P.earR += pulse * 9;
+  P.tailWag += e * 1.6; P.tilt += Math.sin((t - A.firstBeat) / spb2 * Math.PI) * e * 3.5;
+  return P;
+}
+function autoScript(name) {   // build a whole script from the song's structure
+  const A = song.an, per = 4, barLen = 60 / A.bpm * per, nb = Math.max(1, Math.floor((A.duration - A.firstBeat) / barLen));
+  const barE = []; for (let b = 0; b < nb; b++) { let a = 0, c = 0; for (let t = A.firstBeat + b * barLen; t < A.firstBeat + (b + 1) * barLen; t += .05) { a += sampleAt(A.energy, t, A.rate); c++; } barE.push(a / c); }
+  const sorted = [...barE].sort((x, y) => x - y), lo = sorted[Math.floor(nb * .33)], hi = sorted[Math.floor(nb * .7)];
+  const lvl = e => e >= hi ? 'high' : e <= lo ? 'low' : 'mid';
+  const STY = { low: ['lineart', 'pencil', 'crayon', 'cutpaper', 'paint', 'newsprint'], mid: ['comic', 'riso', 'sticker', 'ink', 'chalk', 'blueprint', 'pixel'],
+                high: ['pop', 'acid', 'rgb', 'foil', 'pixelwind', 'vhs', 'static', 'hologram'] };
+  const POS = { low: ['neutral', 'thinking', 'sleepy', 'sad', 'suspicious'], mid: ['smiling', 'thinking', 'waving', 'happy', 'suspicious'], high: ['happy', 'laughing', 'surprised', 'waving', 'furious', 'happy'] };
+  const NAMES = { low: 'quiet section', mid: 'groove', high: 'big section' }, HOLO = ['#ff4fd8', '#39f3ff', '#ffd23a', '#59ff8a'];
+  const who = look().who, L = ['['], q = v => `'${v}'`;
+  L.push(`  // auto-animated to "${name}" · ${A.bpm} BPM · ${nb} bars`);
+  let secLevel = null, secStart = 0, lastPose = '', lastStyle = '', si = 0;
+  for (let b = 0; b < nb; b++) {
+    const lv = lvl(barE[b]);
+    if (b === 0 || (b % 4 === 0 && (lv !== secLevel || b - secStart >= 16))) {
+      secLevel = lv; secStart = b;
+      let st; do { st = STY[lv][Math.floor(rnd(b, 7 + si++) * STY[lv].length)]; } while (st === lastStyle && STY[lv].length > 1); lastStyle = st;
+      L.push(`  // bar ${b + 1}: ${NAMES[lv]}`);
+      L.push(`  { at: [${b + 1}, 1], ${b === 0 ? `character: ${q(who)}, ` : ''}style: ${q(st)}${st === 'hologram' ? `, color: ${q(HOLO[b % 4])}` : ''} },`);
+    }
+    const every = lv === 'high' ? 1 : 2;
+    if (b % every === 0) {
+      let ps; do { ps = POS[lv][Math.floor(rnd(b, 31 + si++) * POS[lv].length)]; } while (ps === lastPose); lastPose = ps;
+      L.push(`  { at: [${b + 1}, 1], pose: ${q(ps)} },`);
+      if (lv === 'high' && b % 2 === 1) L.push(`  { at: [${b + 1}, 3], set: { lookX: ${rnd(b, 5) > .5 ? 9 : -9} } },`);
+    }
+  }
+  L.push(']'); return L.join('\n');
+}
+function drawMeter(t) {
+  const m = $('meter'), g = m.getContext('2d'), A = song.an; g.clearRect(0, 0, 120, 32); if (!A) return;
+  const v = sampleAt(A.vocal, t, A.rate), b = sampleAt(A.bass, t, A.rate), ph = (((t - A.firstBeat) * A.bpm / 60) % 1 + 1) % 1;
+  g.fillStyle = '#ff6fb5'; g.fillRect(4, 5, 104 * v, 9); g.fillStyle = '#ffc23d'; g.fillRect(4, 18, 104 * b, 9);
+  g.fillStyle = `rgba(255,255,255,${Math.exp(-ph * 6)})`; g.beginPath(); g.arc(113, 16, 5, 0, TAU); g.fill();
+}
+let C = compile([], 100, 4), lineOf = [], playing = false, t0 = performance.now() / 1000, tPaused = 0, hasAudio = false;
 let live = null, liveP = null, liveBase = null, tab = 'character', offline = false;
 
 const STYLE_SWATCHES = [
@@ -815,13 +913,13 @@ const cap = s => s[0].toUpperCase() + s.slice(1);
 function rebuild() {
   try {
     const score = new Function(`return (${code.value});`)();
-    C = compile(score, +bpmEl.value || 100, +bpbEl.value || 4);
+    C = compile(score, +bpmEl.value || 100, +bpbEl.value || 4, beatOffset());
     lineOf = []; code.value.split('\n').forEach((l, n) => { if (/\bat\s*:/.test(l) && !/^\s*\/\//.test(l)) lineOf.push(n); });
     err.textContent = '';
   } catch (e) { err.textContent = e.message; }
 }
 const spb = () => 60 / (+bpmEl.value || 100), bpb = () => +bpbEl.value || 4;
-function barBeat(t, step) { const q = Math.round(t / spb() / step) * step, bar = Math.floor(q / bpb()) + 1; return [bar, +(q - (bar - 1) * bpb() + 1).toFixed(2)]; }
+function barBeat(t, step) { const q = Math.round(Math.max(0, t - beatOffset()) / spb() / step) * step, bar = Math.floor(q / bpb()) + 1; return [bar, +(q - (bar - 1) * bpb() + 1).toFixed(2)]; }
 const fmtVal = v => typeof v === 'string' ? `'${v}'` : +(+v).toFixed(2);
 function fmtEvent(at, ev) {
   const parts = [`at: [${at[0]}, ${at[1]}]`];
@@ -841,7 +939,7 @@ const now = () => !playing ? tPaused : hasAudio && song.src ? songTime() : perfo
 function seek(t) { t = Math.max(0, t); if (hasAudio && playing) songPlay(t); t0 = performance.now() / 1000 - t; tPaused = t; }
 function setPlaying(p) {
   const cur = now(); playing = p; playBtn.textContent = p ? 'Pause' : 'Play';
-  if (p) { live = null; seek(tPaused); } else { tPaused = cur; songStop(); }
+  if (p) { live = null; seek(tPaused); } else { tPaused = cur; songStop(); if (unmuteEl) unmuteEl.pause(); }
   updateMode();
 }
 
@@ -932,7 +1030,7 @@ function refreshThumbs(force) {
 }
 
 /* ----- render loop ----- */
-function renderScoreAt(t) { const e = evaluate(C, t); drawCharacter(ctx, e.P, e.S, t, e.who); return e; }
+function renderScoreAt(t) { const e = evaluate(C, t); drawCharacter(ctx, react(e.P, t), e.S, t, e.who); return e; }
 let fc = 0;
 function frame() {
   if (offline) return;
@@ -945,9 +1043,10 @@ function frame() {
     drawCharacter(ctx, shownP, { ...STYLES[live.style], color: live.color }, tw, live.character);
   } else {
     // paused: keep breathing/boiling on the wall clock so the frame never looks dead
-    const e = evaluate(C, t); shownP = e.P; idx = e.idx;
-    drawCharacter(ctx, e.P, e.S, playing ? t : t + (performance.now() / 1000 % 1000), e.who);
+    const e = evaluate(C, t); shownP = react(e.P, t); idx = e.idx;
+    drawCharacter(ctx, shownP, e.S, playing ? t : t + (performance.now() / 1000 % 1000), e.who);
   }
+  if (song.an) drawMeter(t);
   const line = lineOf[idx]; hl.hidden = line == null || !!live;
   if (line != null) hl.style.top = (10 + line * 18 - code.scrollTop) + 'px';
   scrub.value = Math.round(t / dur() * 1000);
@@ -961,12 +1060,30 @@ function frame() {
 }
 
 /* ----- wiring ----- */
-playBtn.onclick = () => setPlaying(!playing);
+// iPhone/iPad: Web Audio is muted by the silent switch. A looping silent <audio> element started inside the tap
+// puts iOS into media-playback mode, which ignores the switch, and Web Audio plays through it.
+const SILENT_WAV = 'data:audio/wav;base64,UklGRsQPAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YaAPAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
+let unmuteEl = null;
+function iosUnmute() {
+  try {
+    if (!unmuteEl) { unmuteEl = document.createElement('audio'); unmuteEl.setAttribute('playsinline', ''); unmuteEl.setAttribute('x-webkit-airplay', 'deny'); unmuteEl.loop = true; unmuteEl.preload = 'auto'; unmuteEl.src = SILENT_WAV; }
+    const p = unmuteEl.play(); if (p && p.catch) p.catch(() => {});
+  } catch (_) {}
+}
+function unlockAudio() {
+  iosUnmute();
+  try {
+    if (navigator.audioSession) navigator.audioSession.type = 'playback';   // iPhone: play even with the silent switch on
+    song.ac = song.ac || new (window.AudioContext || window.webkitAudioContext)(); song.ac.resume();
+    const b = song.ac.createBuffer(1, 1, 22050), s = song.ac.createBufferSource(); s.buffer = b; s.connect(song.ac.destination); s.start(0);
+  } catch (_) {}
+}
+playBtn.onclick = () => { if (hasAudio) unlockAudio(); setPlaying(!playing); };
 $('restart').onclick = () => { live = null; seek(0); updateMode(); };
 scrub.oninput = () => { live = null; seek(scrub.value / 1000 * dur()); updateMode(); };
 code.oninput = bpmEl.oninput = bpbEl.oninput = rebuild;
 $('loadSong').onclick = () => {   // create/unlock audio inside the tap itself so phones allow playback
-  try { song.ac = song.ac || new (window.AudioContext || window.webkitAudioContext)(); song.ac.resume(); } catch (_) {}
+  unlockAudio();
   $('audioFile').click();
 };
 $('svgFile').onchange = async e => {
@@ -984,17 +1101,24 @@ $('audioFile').onchange = async e => {
     if (!song.ac) song.ac = new (window.AudioContext || window.webkitAudioContext)();
     const data = await f.arrayBuffer();
     song.buf = await new Promise((ok, no) => { const r = song.ac.decodeAudioData(data, ok, no); if (r && r.then) r.then(ok, no); });
-    songStop(); hasAudio = true; btn.textContent = '♪ ' + (f.name.length > 22 ? f.name.slice(0, 20) + '…' : f.name);
-    playing = false; tPaused = 0; setPlaying(true);
+    songStop(); setPlaying(false); btn.textContent = 'Listening…';
+    song.an = await analyseSong(song.buf); song.name = f.name.replace(/\.[^.]+$/, '');
+    hasAudio = true; bpmEl.value = song.an.bpm; bpbEl.value = 4; rebuild();
+    btn.textContent = '♪ ' + (f.name.length > 22 ? f.name.slice(0, 20) + '…' : f.name);
+    $('songInfo').textContent = `${song.an.bpm} BPM · first beat ${song.an.firstBeat.toFixed(2)}s` + (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? ' · no sound? turn off silent mode' : '');
+    for (const id of ['songInfo', 'autoBtn', 'listenBtn', 'meter']) $(id).hidden = false;
+    tPaused = 0; updateMode(); modeEl.innerHTML = `<b>Song ready.</b> Press Play, or ✨ Auto-animate to build a script from it`;
   } catch (x) {
     btn.textContent = 'Load song';
     err.textContent = `Couldn't play "${f.name}". Try an MP3, M4A/AAC or WAV file. Songs bought from Apple Music or Spotify are copy-protected and can't be loaded.`;
   }
 };
+$('autoBtn').onclick = () => { if (!song.an) return; code.value = autoScript(song.name || 'song'); rebuild(); code.scrollTop = 0; live = null; seek(0); updateMode(); };
+$('listenBtn').onclick = e => { listening = !listening; e.target.setAttribute('aria-pressed', listening); e.target.textContent = `Listening: ${listening ? 'on' : 'off'}`; };
 document.addEventListener('keydown', e => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); setPlaying(!playing); } });
 
 code.value = DEFAULT_SCORE; rebuild(); buildTab(); updateMode(); requestAnimationFrame(frame);
 
 // hook for the offline renderer (render.cjs): deterministic frame-by-frame export
-window.RIG = { renderAt: t => { offline = true; renderScoreAt(t); }, duration: () => C.duration, canvas: cv };
+window.RIG = { renderAt: t => { offline = true; renderScoreAt(t); }, duration: () => dur(), canvas: cv, ready: () => !hasAudio || !!song.an, hasSong: () => hasAudio };
 </script>

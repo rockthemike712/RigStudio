@@ -16,9 +16,23 @@ Open `rig-demo/index.html` in a browser. It has three parts:
   - **Playing:** every click is recorded into the script on the nearest half-beat, so you can perform along to a song ("Load song").
 - **Script** (left): the source of truth. It's editable, changes apply live, and the line currently playing is highlighted.
 
+## Songs
+"Load song" decodes the file and analyses it once:
+- **Tempo:** the BPM and the first downbeat, so `[bar, beat]` lands on the song's real bars.
+- **Envelopes:** separate levels for vocals (300–3400 Hz), bass (under 140 Hz) and overall energy.
+
+With "Listening: on", the character reacts to the song:
+- the mouth follows the vocals
+- the body squashes, bounces and flicks its ears on every beat
+- the tail wags with the song's energy, and the body sways on the beat
+
+"✨ Auto-animate" writes a whole script from the song's structure. It picks calmer styles and poses for quiet sections and glitch styles for big ones, changing on 4-bar boundaries.
+
+The lip sync is based on loudness, not on the words: it doesn't recognise lyrics.
+
 ## Frame-exact export
 ```bash
-node rig-demo/render.cjs out.mp4 30 song.mp3
+node rig-demo/render.cjs out.mp4 30 song.mp3 --auto   # --auto: build the script from the song
 ```
 This steps time frame by frame in headless Chromium and pipes the frames to ffmpeg, so no frames are dropped. Needs Playwright and ffmpeg.
 
