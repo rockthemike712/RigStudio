@@ -30,6 +30,7 @@
   input[type=number] { width:62px; padding:6px 8px; }
   .lbl { color:var(--dim); font-size:12px; }
   #scrub { flex:1 1 160px; min-width:120px; accent-color:var(--accent); }
+  #lipSens { width:90px; accent-color:var(--accent); }
   #meter { width:60px; height:16px; border-radius:3px; background:var(--raised); }
   #listenBtn[aria-pressed=false] { color:var(--dim); }
   #clock { font:12px var(--mono); color:var(--dim); min-width:150px; font-variant-numeric:tabular-nums; }
@@ -99,6 +100,7 @@
     <span id="songInfo" class="lbl" hidden></span>
     <button id="autoBtn" hidden>✨ Auto-animate</button>
     <button id="listenBtn" hidden aria-pressed="true">Listening: on</button>
+    <label class="lbl" id="lipLbl" for="lipSens" hidden title="How readily the mouth treats sound as words. Lower it if the mouth moves during instrumental parts.">Lip sync</label><input id="lipSens" type="range" min="0" max="1" step="0.05" value="0.5" hidden aria-label="Lip sync sensitivity">
     <input id="svgFile" type="file" accept=".svg,image/svg+xml" hidden>
   </header>
   <main>
@@ -1484,10 +1486,73 @@ function songPlay(from) {
 }
 const dur = () => hasAudio ? Math.max(C.duration, song.buf.duration) : C.duration;
 const beatOffset = () => hasAudio && song.an ? song.an.firstBeat : 0;
-let listening = true;
+let listening = true, lipSens = .5;
 
 /* ----- listening: analyse the song once (offline, so playback, scrubbing and export all agree) ----- */
-async function analyseSong(buf) {
+/* ----- finding the words: tell singing/speech apart from instruments -----
+   Per 20 ms frame (stereo, 22 kHz): centre-panned spectrum (voices sit in the middle; stereo guitars/hats drop out),
+   pitch strength and pitch from its autocorrelation. Over ~0.3 s windows: how much the pitch glides (voices slide,
+   instruments hold notes) and how often pitched sound switches on/off (consonants interrupt words). Decided per
+   phrase (~0.8 s) so the mouth doesn't flicker; inside a phrase the mouth follows each syllable's loudness, and the
+   vowel colour (first/second formant energy) sets how wide or round the mouth is. */
+function fftInPlace(re, im) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) { let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { let q = re[i]; re[i] = re[j]; re[j] = q; q = im[i]; im[i] = im[j]; im[j] = q; } }
+  for (let len = 2; len <= n; len <<= 1) { const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang), h = len >> 1;
+    for (let i = 0; i < n; i += len) { let cr = 1, ci = 0; for (let j = 0; j < h; j++) { const a = i + j, b = a + h, xr = re[b] * cr - im[b] * ci, xi = re[b] * ci + im[b] * cr;
+      re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi; const q = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = q; } } }
+}
+async function vocalTrack(buf, progress) {
+  const sr = 22050, N = 1024, hop = 441, len = Math.ceil(buf.duration * sr);
+  const oc = new OfflineAudioContext(2, len, sr), src = oc.createBufferSource(), hp = oc.createBiquadFilter();
+  src.buffer = buf; hp.type = 'highpass'; hp.frequency.value = 120; src.connect(hp); hp.connect(oc.destination); src.start();
+  const r = await oc.startRendering(), Lc = r.getChannelData(0), Rc = r.numberOfChannels > 1 ? r.getChannelData(1) : Lc;
+  const fr = Math.max(0, Math.floor((Lc.length - N) / hop)), win = new Float32Array(N).map((_, i) => .5 - .5 * Math.cos(2 * Math.PI * i / (N - 1)));
+  const binHz = sr / N, kb = f => Math.round(f / binHz), b0 = kb(250), b1 = kb(3500), f1a = kb(300), f1b = kb(900), f2a = kb(1400), f2b = kb(2800);
+  const db = new Float32Array(fr), harm = new Float32Array(fr), f0 = new Float32Array(fr), f1r = new Float32Array(fr), f2r = new Float32Array(fr);
+  const re = new Float64Array(N), im = new Float64Array(N), Pc = new Float64Array(N);
+  for (let f = 0; f < fr; f++) {
+    const o = f * hop; for (let i = 0; i < N; i++) { re[i] = Lc[o + i] * win[i]; im[i] = Rc[o + i] * win[i]; }
+    fftInPlace(re, im); Pc.fill(0); let e = 0, e1 = 0, e2 = 0;
+    for (let k = 1; k < N / 2; k++) {   // split the packed transform back into left and right, then keep what is centred
+      const zr = re[k], zi = im[k], wr2 = re[N - k], wi2 = -im[N - k];
+      const ar = (zr + wr2) / 2, ai = (zi + wi2) / 2, br = (zi - wi2) / 2, bi = -(zr - wr2) / 2;
+      const mr = (ar + br) / 2, mi = (ai + bi) / 2, sr2 = (ar - br) / 2, si = (ai - bi) / 2, M = Math.hypot(mr, mi), Sd = Math.hypot(sr2, si);
+      const c = Math.max(0, 1 - Sd / (M + 1e-9)), p = M * M * c * c;
+      if (k >= b0 && k <= b1) { Pc[k] = p; Pc[N - k] = p; e += p; if (k >= f1a && k < f1b) e1 += p; if (k >= f2a && k < f2b) e2 += p; }
+    }
+    db[f] = 10 * Math.log10(e + 1e-12); f1r[f] = e1 / (e + 1e-12); f2r[f] = e2 / (e + 1e-12);
+    for (let i = 0; i < N; i++) { re[i] = Pc[i]; im[i] = 0; } fftInPlace(re, im);   // autocorrelation of the centred spectrum → pitch
+    let best = 25, bv = -1e30; for (let j = 25; j <= 220; j++) if (re[j] > bv) { bv = re[j]; best = j; }
+    harm[f] = bv / (re[0] + 1e-12);
+    const a = re[best - 1], b = re[best], c2 = re[best + 1], d = .5 * (a - c2) / (a - 2 * b + c2 || 1e-12); f0[f] = sr / (best + Math.max(-.5, Math.min(.5, d)));
+    if (f % 400 === 399) { progress && progress(f / fr); await new Promise(q => setTimeout(q)); }
+  }
+  let mx = -1e9; for (const v of db) mx = Math.max(mx, v);
+  const clamp = v => Math.max(0, Math.min(1, v)), voiced = new Uint8Array(fr), glide = new Float32Array(fr).fill(NaN);
+  for (let f = 0; f < fr; f++) voiced[f] = harm[f] > .4 && db[f] > mx - 40 ? 1 : 0;
+  for (let f = 1; f < fr; f++) { const c = 1200 * Math.log2(f0[f] / f0[f - 1]); if (voiced[f] && voiced[f - 1] && Math.abs(c) < 150) glide[f] = Math.abs(c); }
+  const speech = new Float32Array(fr), tmp = [];
+  for (let f = 0; f < fr; f++) {
+    let vs = 0, vn = 0, sw = 0; tmp.length = 0;
+    for (let j = f - 10; j <= f + 10; j++) if (j >= 0 && j < fr) { vs += voiced[j]; vn++; }
+    for (let j = f - 7; j <= f + 7; j++) if (j > 0 && j < fr) { sw += voiced[j] !== voiced[j - 1]; if (!isNaN(glide[j])) tmp.push(glide[j]); }
+    tmp.sort((x, y) => x - y); const gm = tmp.length ? tmp[tmp.length >> 1] : 0;
+    speech[f] = vs / vn >= .25 ? clamp(.55 * clamp((gm - 10) / 12) + .45 * clamp((sw - .5) / 1.2)) : 0;
+  }
+  const phrase = new Float32Array(fr), lip = new Float32Array(fr), width = new Float32Array(fr);
+  for (let f = 0; f < fr; f++) { let s = 0, n = 0, lm = -1e9; for (let j = f - 20; j < f + 20; j++) if (j >= 0 && j < fr) { s += speech[j]; n++; } for (let j = f - 25; j < f + 25; j++) if (j >= 0 && j < fr) lm = Math.max(lm, db[j]);
+    phrase[f] = s / n; lip[f] = clamp((db[f] - (lm - 18)) / 18); width[f] = clamp((f2r[f] - .08) / .35 + .2 - (f1r[f] - .5) * .4); }
+  const near = new Uint8Array(fr); for (let f = 0; f < fr; f++) for (let j = f - 3; j <= f + 3; j++) if (j >= 0 && j < fr && voiced[j]) { near[f] = 1; break; }   // pitched sound within ~60 ms
+  return { lipRate: sr / hop, phrase, lip, width, near };
+}
+function buildMouth(A, sens = .5) {   // phrase gate with hysteresis; sensitivity 0 = strict, 1 = loose
+  const thr = .5 - sens * .35, n = A.phrase.length, mouth = new Float32Array(n); let on = false;
+  for (let f = 0; f < n; f++) { on = on ? A.phrase[f] > thr * .7 : A.phrase[f] > thr; mouth[f] = on && A.near[f] ? Math.max(0, (A.lip[f] - .25) / .75) : 0; }
+  A.mouth = mouth;
+}
+
+async function analyseSong(buf, progress) {
   const sr = 22050, hop = 220, rate = sr / hop, len = Math.ceil(buf.duration * sr);
   const band = async filters => {
     const oc = new OfflineAudioContext(1, len, sr), src = oc.createBufferSource(); src.buffer = buf; let node = src;
@@ -1521,16 +1586,18 @@ async function analyseSong(buf) {
   const per = 60 * rate / best;
   let down = 0, downScore = -1;
   for (let d = 0; d < 4; d++) { let sc = 0; for (let k = off + d * per; k < n; k += per * 4) sc += B[Math.round(k)]; if (sc > downScore) { downScore = sc; down = d; } }
-  return { rate, vocal: V, bass: B, energy: E, bpm: best, firstBeat: (off + down * per) / rate, duration: buf.duration };
+  const words = await vocalTrack(buf, progress);
+  const A = { rate, vocal: V, bass: B, energy: E, bpm: best, firstBeat: (off + down * per) / rate, duration: buf.duration, ...words };
+  buildMouth(A, lipSens); return A;
 }
 const sampleAt = (a, t, rate) => { const x = t * rate, i = Math.floor(x); if (i < 0 || i + 1 >= a.length) return 0; return a[i] + (a[i + 1] - a[i]) * (x - i); };
 function react(P, t) {   // the character responds to what it hears: lips follow vocals, body hits the beat
   const A = song.an; if (!A || !listening || !hasAudio) return P;
-  const v = sampleAt(A.vocal, t, A.rate), b = sampleAt(A.bass, t, A.rate), e = sampleAt(A.energy, t, A.rate);
+  const v = sampleAt(A.mouth, t, A.lipRate), wv = sampleAt(A.width, t, A.lipRate), b = sampleAt(A.bass, t, A.rate), e = sampleAt(A.energy, t, A.rate);
   const spb2 = 60 / A.bpm; let ph = ((t - A.firstBeat) / spb2) % 1; if (ph < 0) ph += 1;
   const pulse = Math.exp(-ph * 7) * (.35 + .65 * b);
   P = { ...P };
-  if (v > .12) { P.mouthOpen = Math.max(P.mouthOpen, v * 22); P.mouthW *= .92; }
+  if (v > .05) { P.mouthOpen = Math.max(P.mouthOpen, v * 24); P.mouthW *= .62 + .55 * wv; }   // open on syllables; wide for ee/a, round for oo/o
   P.squash -= pulse * .07; P.by += pulse * 9; P.earL -= pulse * 9; P.earR += pulse * 9;
   P.tailWag += e * 1.6; P.tilt += Math.sin((t - A.firstBeat) / spb2 * Math.PI) * e * 3.5;
   return P;
@@ -1566,7 +1633,7 @@ function autoScript(name) {   // build a whole script from the song's structure
 }
 function drawMeter(t) {
   const m = $('meter'), g = m.getContext('2d'), A = song.an; g.clearRect(0, 0, 120, 32); if (!A) return;
-  const v = sampleAt(A.vocal, t, A.rate), b = sampleAt(A.bass, t, A.rate), ph = (((t - A.firstBeat) * A.bpm / 60) % 1 + 1) % 1;
+  const v = sampleAt(A.mouth, t, A.lipRate), b = sampleAt(A.bass, t, A.rate), ph = (((t - A.firstBeat) * A.bpm / 60) % 1 + 1) % 1;
   g.fillStyle = '#ff6fb5'; g.fillRect(4, 5, 104 * v, 9); g.fillStyle = '#ffc23d'; g.fillRect(4, 18, 104 * b, 9);
   g.fillStyle = `rgba(255,255,255,${Math.exp(-ph * 6)})`; g.beginPath(); g.arc(113, 16, 5, 0, TAU); g.fill();
 }
@@ -1786,17 +1853,18 @@ $('audioFile').onchange = async e => {
     const data = await f.arrayBuffer();
     song.buf = await new Promise((ok, no) => { const r = song.ac.decodeAudioData(data, ok, no); if (r && r.then) r.then(ok, no); });
     songStop(); setPlaying(false); btn.textContent = 'Listening…';
-    song.an = await analyseSong(song.buf); song.name = f.name.replace(/\.[^.]+$/, '');
+    song.an = await analyseSong(song.buf, q => { btn.textContent = `Listening… ${Math.round(q * 100)}%`; }); song.name = f.name.replace(/\.[^.]+$/, '');
     hasAudio = true; bpmEl.value = song.an.bpm; bpbEl.value = 4; rebuild();
     btn.textContent = '♪ ' + (f.name.length > 22 ? f.name.slice(0, 20) + '…' : f.name);
     $('songInfo').textContent = `${song.an.bpm} BPM · first beat ${song.an.firstBeat.toFixed(2)}s` + (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? ' · no sound? turn off silent mode' : '');
-    for (const id of ['songInfo', 'autoBtn', 'listenBtn', 'meter']) $(id).hidden = false;
+    for (const id of ['songInfo', 'autoBtn', 'listenBtn', 'meter', 'lipLbl', 'lipSens']) $(id).hidden = false;
     tPaused = 0; updateMode(); modeEl.innerHTML = `<b>Song ready.</b> Press Play, or ✨ Auto-animate to build a script from it`;
   } catch (x) {
     btn.textContent = 'Load song';
     err.textContent = `Couldn't play "${f.name}". Try an MP3, M4A/AAC or WAV file. Songs bought from Apple Music or Spotify are copy-protected and can't be loaded.`;
   }
 };
+$('lipSens').oninput = e => { lipSens = +e.target.value; if (song.an) buildMouth(song.an, lipSens); };
 $('autoBtn').onclick = () => { if (!song.an) return; code.value = autoScript(song.name || 'song'); rebuild(); code.scrollTop = 0; live = null; seek(0); updateMode(); };
 $('listenBtn').onclick = e => { listening = !listening; e.target.setAttribute('aria-pressed', listening); e.target.textContent = `Listening: ${listening ? 'on' : 'off'}`; };
 document.addEventListener('keydown', e => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); setPlaying(!playing); } });
