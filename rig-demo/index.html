@@ -54,6 +54,9 @@
   .tile span { padding:5px 8px; font-size:12px; color:var(--dim); }
   .tile[aria-pressed=true] { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
   .tile[aria-pressed=true] span { color:var(--text); }
+  .lock { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; margin-bottom:12px; border:1px solid var(--line); border-radius:8px; background:var(--raised); cursor:pointer; }
+  .lock input { margin-top:3px; accent-color:var(--accent); } .lock small { color:var(--dim); }
+  #autoMood { padding:6px 8px; }
   .cat { display:flex; justify-content:space-between; color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.08em; margin:14px 2px 8px; border-top:1px solid var(--line); padding-top:10px; }
   .cat:first-child { margin-top:2px; border-top:0; padding-top:0; }
   .tile.import { justify-content:center; align-items:center; min-height:96px; border-style:dashed; }
@@ -103,6 +106,8 @@
     <canvas id="meter" width="120" height="32" hidden aria-label="What the character hears: vocals and beat"></canvas>
     <span id="songInfo" class="lbl" hidden></span>
     <button id="autoBtn" hidden>✨ Auto-animate</button>
+    <select id="autoMood" hidden aria-label="Styles for auto-animate"><option value="mixed">Styles: follow the song</option><option value="keep">Styles: keep current</option><option value="calm">Styles: calm</option><option value="wild">Styles: wild</option></select>
+    <label class="lbl" id="autoCamLbl" hidden><input type="checkbox" id="autoCam" checked> Camera moves</label>
     <button id="listenBtn" hidden aria-pressed="true">Listening: on</button>
     <label class="lbl" id="lipLbl" for="lipSens" hidden title="How readily the mouth treats sound as words. Lower it if the mouth moves during instrumental parts.">Lip sync</label><input id="lipSens" type="range" min="0" max="1" step="0.05" value="0.5" hidden aria-label="Lip sync sensitivity">
     <input id="svgFile" type="file" accept=".svg,image/svg+xml" hidden>
@@ -1515,12 +1520,13 @@ const BGX = {
 const ease = x => { const c1 = 1.70158, c3 = c1 + 1; return x >= 1 ? 1 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); }; // overshoot = cartoon snap
 const STYLE_ALIASES = { inkpunch:'pop', cubist:'cubistmosh', trails:'windowtrails', glitch:'rgb', channelshift:'rgb', print:'comic', inkbleed:'inkbleed', watercolour:'paint', pixel8:'pixel', lcd:'pixel', vhstape:'vhs' };
 const HOLO_PALETTES = { cyan:['#39f3ff'], green:['#59ff8a'], amber:['#ffb53a'], red:['#ff3344'], blue:['#3a6bff'], white:['#e8eef7'], ghost:['#e8eef7'], security:['#59ff8a', '#ff4fd8'], rose:['#ff7aa8', '#ffd23a'], gold:['#ffd23a'], pink:['#ff4fd8'] };
+let starLock = true, star = 'hashbrown';   // one character for the whole song unless the user turns this off
 function compile(score, bpm, bpb, offset = 0) {
   const spb = 60 / bpm, beatTime = ([bar, beat]) => offset + ((bar - 1) * bpb + (beat - 1)) * spb;
   const ev = score.map((e, idx) => ({ ...e, idx, t: beatTime(e.at) })).sort((a, b) => a.t - b.t || a.idx - b.idx);
-  let pose = 'neutral', set = {}, cam = {}, grid = 1, style = 'lineart', color = null, color2 = null, character = 'hashbrown';
+  let pose = 'neutral', set = {}, cam = {}, grid = 1, style = 'lineart', color = null, color2 = null, character = starLock ? star : 'hashbrown';
   for (const e of ev.filter(q => q.t === (ev[0] && ev[0].t))) {   // what the script opens with also covers any lead-in before its first beat
-    const w = e.who || e.preset || e.character || e.create; if (w && CHARACTERS[w === 'doug' ? 'fridge' : w]) character = w === 'doug' ? 'fridge' : w;
+    const w = !starLock && (e.who || e.preset || e.character || e.create); if (w && CHARACTERS[w === 'doug' ? 'fridge' : w]) character = w === 'doug' ? 'fridge' : w;
     const st = e.style && (STYLE_ALIASES[e.style] || e.style); if (st && STYLES[st]) style = st; }
   const keys = [{ t: 0, params: { ...BASE }, style, color, color2, character, grid, pose: 'neutral', idx: -1 }], talks = [];
   const names = o => Object.keys(o).join(', ');
@@ -1530,7 +1536,7 @@ function compile(score, bpm, bpb, offset = 0) {
     if (e.set != null) { if (typeof e.set === 'string') { const [key, f] = SET_ALIASES[e.set] || [e.set, 1]; if (!(key in BASE)) throw new Error(`unknown setting '${e.set}'`); set = { ...set, [key]: (+e.to) * f }; } else set = { ...set, ...e.set }; }
     if (e.style) { const id = STYLE_ALIASES[e.style] || e.style; if (!STYLES[id]) throw new Error(`unknown style '${e.style}' — try: ${names(STYLES)}`); style = id;
       const pal = e.palette && HOLO_PALETTES[String(e.palette).split(/[\s:]/)[0].toLowerCase()]; color = e.color || (pal && pal[0]) || null; color2 = e.color2 || (pal && pal[1]) || null; }
-    const who = e.who || e.preset || e.character || e.create;
+    const who = !starLock && (e.who || e.preset || e.character || e.create);
     if (who) { const id = who === 'doug' ? 'fridge' : who; if (!CHARACTERS[id]) throw new Error(`unknown character '${who}' — try: ${names(CHARACTERS)}`); character = id; }
     if (e.camera != null) { const c = CAMERAS[e.camera]; if (!c) throw new Error(`unknown camera '${e.camera}' — try 1–4, or full, close, medium, handheld`); cam = { ...c }; }
     if (e.grid != null) grid = Math.max(1, Math.min(7, +e.grid || 1));
@@ -1717,31 +1723,39 @@ function react(P, t) {   // the character responds to what it hears: lips follow
   P.tailWag += e * 1.6; P.tilt += Math.sin((t - A.firstBeat) / spb2 * Math.PI) * e * 3.5;
   return P;
 }
-function autoScript(name) {   // build a whole script from the song's structure
-  const A = song.an, per = 4, barLen = 60 / A.bpm * per, nb = Math.max(1, Math.floor((A.duration - A.firstBeat) / barLen));
-  const barE = []; for (let b = 0; b < nb; b++) { let a = 0, c = 0; for (let t = A.firstBeat + b * barLen; t < A.firstBeat + (b + 1) * barLen; t += .05) { a += sampleAt(A.energy, t, A.rate); c++; } barE.push(a / c); }
+let autoTake = 0;
+function autoScript(name, opts = {}) {   // build a whole script from the song: sections, where the vocals are, how loud it is
+  const A = song.an, per = 4, barLen = 60 / A.bpm * per, nb = Math.max(1, Math.floor((A.duration - A.firstBeat) / barLen)), take = opts.take || 0;
+  const mood = opts.mood || 'mixed', cam = opts.camera !== false, R = (a, b2) => rnd(a + take * 997, b2 + take * 131);
+  const barE = [], barV = [];
+  for (let b = 0; b < nb; b++) { let a = 0, v = 0, c = 0; for (let t = A.firstBeat + b * barLen; t < A.firstBeat + (b + 1) * barLen; t += .05) { a += sampleAt(A.energy, t, A.rate); v += (A.mouth && sampleAt(A.mouth, t, A.lipRate) > .05) ? 1 : 0; c++; } barE.push(a / c); barV.push(v / c); }
   const sorted = [...barE].sort((x, y) => x - y), lo = sorted[Math.floor(nb * .33)], hi = sorted[Math.floor(nb * .7)];
   const lvl = e => e >= hi ? 'high' : e <= lo ? 'low' : 'mid';
-  const STY = { low: ['lineart', 'pencil', 'crayon', 'cutpaper', 'paint', 'newsprint'], mid: ['comic', 'riso', 'sticker', 'ink', 'chalk', 'blueprint', 'pixel'],
-                high: ['pop', 'acid', 'rgb', 'foil', 'pixelwind', 'vhs', 'static', 'hologram'] };
-  const POS = { low: ['neutral', 'thinking', 'sleepy', 'sad', 'suspicious'], mid: ['smiling', 'thinking', 'waving', 'happy', 'suspicious'], high: ['happy', 'laughing', 'surprised', 'waving', 'furious', 'happy'] };
-  const NAMES = { low: 'quiet section', mid: 'groove', high: 'big section' }, HOLO = ['#ff4fd8', '#39f3ff', '#ffd23a', '#59ff8a'];
-  const who = look().who, L = ['['], q = v => `'${v}'`;
-  L.push(`  // auto-animated to "${name}" · ${A.bpm} BPM · ${nb} bars`);
-  let secLevel = null, secStart = 0, lastPose = '', lastStyle = '', si = 0;
+  const STY = { low: ['lineart', 'pencil', 'crayon', 'cutpaper', 'paint', 'ballpoint', 'feathered'], mid: ['comic', 'riso', 'sticker', 'ink', 'chalk', 'manga', 'cel', 'flash', 'gigposter'],
+                high: ['pop', 'acid', 'rgb', 'foil', 'pixelwind', 'vhs', 'static', 'hologram', 'neon', 'chrome', 'shonen'] };
+  const pool = lv => mood === 'calm' ? [...STY.low, ...STY.mid.slice(0, 4)] : mood === 'wild' ? [...STY.high, ...STY.mid.slice(0, 3)] : STY[lv];
+  // singing → talk-to-camera poses; instrumental → dancing; quiet → idle
+  const SING = { low: ['at-ease', 'feel-happy', 'thinking', 'secret', 'smiling'], mid: ['selling', 'you', 'feel-happy', 'deal', 'smiling', 'pleased'], high: ['feel-excited', 'you', 'feel-laughing', 'selling', 'deal'] };
+  const DANCE = { low: ['at-ease', 'thinking', 'feel-bored', 'sleepy', 'doubtful'], mid: ['waving', 'pleased', 'feel-happy', 'laughing', 'at-ease'], high: ['feel-excited', 'laughing', 'waving', 'alarmed', 'feel-laughing', 'surprised'] };
+  const NAMES = { low: 'quiet', mid: 'groove', high: 'big' }, HOLO = ['#ff4fd8', '#39f3ff', '#ffd23a', '#59ff8a'], cur = look(), q = v => `'${v}'`, L = ['['];
+  L.push(`  // auto-animated to "${name}" · ${A.bpm} BPM · ${nb} bars · take ${take + 1}`);
+  let secLevel = null, secStart = 0, lastPose = '', lastStyle = cur.style, si = 0, lastCam = '';
   for (let b = 0; b < nb; b++) {
-    const lv = lvl(barE[b]);
+    const lv = lvl(barE[b]), sing = barV[b] > .25;
     if (b === 0 || (b % 4 === 0 && (lv !== secLevel || b - secStart >= 16))) {
-      secLevel = lv; secStart = b;
-      let st; do { st = STY[lv][Math.floor(rnd(b, 7 + si++) * STY[lv].length)]; } while (st === lastStyle && STY[lv].length > 1); lastStyle = st;
-      L.push(`  // bar ${b + 1}: ${NAMES[lv]}`);
-      L.push(`  { at: [${b + 1}, 1], ${b === 0 ? `character: ${q(who)}, ` : ''}style: ${q(st)}${st === 'hologram' ? `, color: ${q(HOLO[b % 4])}` : ''} },`);
+      secLevel = lv; secStart = b; const parts = [];
+      if (mood !== 'keep' || b === 0) { let st = cur.style;
+        if (mood !== 'keep') { const P2 = pool(lv); do { st = P2[Math.floor(R(b, 7 + si++) * P2.length)]; } while (st === lastStyle && P2.length > 1); }
+        lastStyle = st; parts.push(`style: ${q(st)}`); if (st === 'hologram') parts.push(`color: ${q(HOLO[(b + take) % 4])}`); }
+      if (cam) { const c = lv === 'high' ? (R(b, 3) > .5 ? 'handheld' : 'close') : sing ? (R(b, 4) > .5 ? 'medium' : 'close') : 'full'; if (c !== lastCam) { parts.push(`camera: ${q(c)}`); lastCam = c; } }
+      L.push(`  // bar ${b + 1}: ${NAMES[lv]}${sing ? ', vocals' : ''}`);
+      if (parts.length) L.push(`  { at: [${b + 1}, 1], ${parts.join(', ')} },`);
     }
     const every = lv === 'high' ? 1 : 2;
     if (b % every === 0) {
-      let ps; do { ps = POS[lv][Math.floor(rnd(b, 31 + si++) * POS[lv].length)]; } while (ps === lastPose); lastPose = ps;
+      const P3 = (sing ? SING : DANCE)[lv]; let ps; do { ps = P3[Math.floor(R(b, 31 + si++) * P3.length)]; } while (ps === lastPose && P3.length > 1); lastPose = ps;
       L.push(`  { at: [${b + 1}, 1], pose: ${q(ps)} },`);
-      if (lv === 'high' && b % 2 === 1) L.push(`  { at: [${b + 1}, 3], set: { lookX: ${rnd(b, 5) > .5 ? 9 : -9} } },`);
+      if (lv === 'high' && b % 2 === 1) L.push(`  { at: [${b + 1}, 3], set: { lookX: ${R(b, 5) > .5 ? 9 : -9} } },`);
     }
   }
   L.push(']'); return L.join('\n');
@@ -1813,7 +1827,9 @@ function enterLive() {
   live = { character: e.who, style: e.styleName, color: e.S.color, color2: e.S.color2 || null, pose: e.pose, set: {} };
   liveBase = { ...live }; liveP = { ...e.P };
 }
+function setStar(id) { star = id; rebuild(); if (live) live.character = id; updateMode(); refreshThumbs(true); }
 function act(change, commit = true) {
+  if (change.character && starLock) { setStar(change.character); return; }   // with one star, tapping a character just recasts the whole song
   if (playing) {                       // performing: every click lands in the script on the nearest half-beat
     if (!commit) return;
     insertEvent(barBeat(now(), .5), change); flashMode(); return;
@@ -1843,14 +1859,7 @@ addBtn.onclick = () => {
   insertEvent(barBeat(now(), 1), d); live = null;
   stepBeats(1);   // move on a beat, so the next change lands after this one
 };
-// one character for the whole song: drop every character switch from the script and set the pick at the start
-function useCharacterForSong(who) {
-  let src = code.value.replace(/\b(character|who|preset|create)\s*:\s*('[^']*'|"[^"]*"|\w+)\s*,?\s*/g, '');
-  src = src.split('\n').filter(l => !/^\s*\{\s*at:\s*\[[^\]]*\],?\s*\},?\s*$/.test(l)).join('\n');   // lines left with nothing but a time
-  const open = src.indexOf('['); code.value = src.slice(0, open + 1) + `\n  { at: [1, 1], character: '${who}' },` + src.slice(open + 1);
-  rebuild();
-}
-$('wholeBtn').onclick = () => { if (!live) return; useCharacterForSong(live.character); live = null; updateMode(); refreshThumbs(true); };
+$('wholeBtn').onclick = () => { if (!live) return; const id = live.character; live = null; starLock = true; setStar(id); buildTab(); };
 $('discardBtn').onclick = () => { live = null; updateMode(); refreshThumbs(true); };
 let flashUntil = 0;
 function flashMode() { flashUntil = performance.now() + 700; updateMode(); setTimeout(updateMode, 720); }
@@ -1893,6 +1902,11 @@ function buildTab() {
       r.onchange = () => { if (playing) act({ set: { [r.dataset.k]: +r.value } }, true); };
     });
   } else tiles(tabItems);
+  if (tab === 'character') {
+    const lock = document.createElement('label'); lock.className = 'lock';
+    lock.innerHTML = `<input type="checkbox" id="lockChk" ${starLock ? 'checked' : ''}> <span><b>One character for the whole song</b><br><small>${starLock ? 'Tap a character to make it the star. Script switches are ignored.' : 'The script decides: tap to preview, then Add to switch at that beat.'}</small></span>`;
+    tabbody.prepend(lock); $('lockChk').onchange = e => { starLock = e.target.checked; if (starLock) star = look().who; rebuild(); buildTab(); updateMode(); };
+  }
   if (tab === 'character') { const b = document.createElement('button'); b.className = 'tile import'; b.innerHTML = '<span>＋ Import SVG character…</span>'; b.onclick = () => $('svgFile').click(); tabbody.querySelector('.grid').appendChild(b); }
   tabbody.scrollTop = 0; refreshThumbs(true);
 }
@@ -1990,21 +2004,25 @@ $('audioFile').onchange = async e => {
     songStop(); setPlaying(false); btn.textContent = 'Listening…';
     song.an = await analyseSong(song.buf, q => { btn.textContent = `Listening… ${Math.round(q * 100)}%`; }); song.name = f.name.replace(/\.[^.]+$/, '');
     hasAudio = true; bpmEl.value = song.an.bpm; bpbEl.value = 4;
-    if (code.value.trim() === DEFAULT_SCORE.trim()) {   // the demo switches characters on purpose; a song gets a clean start instead
-      const L = look(); code.value = `[\n  // "${song.name}": tap poses and styles while it plays to write them in, or press ✨ Auto-animate\n  { at: [1, 1], character: '${L.who}', style: '${L.style}', pose: 'happy' },\n]`;
-    }
+    const fresh = code.value.trim() === DEFAULT_SCORE.trim() || /^\[\s*\/\/ (auto-animated to|"[^\n]*": tap poses)/.test(code.value.trim());
     rebuild();
     btn.textContent = '♪ ' + (f.name.length > 22 ? f.name.slice(0, 20) + '…' : f.name);
     $('songInfo').textContent = `${song.an.bpm} BPM · first beat ${song.an.firstBeat.toFixed(2)}s` + (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ? ' · no sound? turn off silent mode' : '');
-    for (const id of ['songInfo', 'autoBtn', 'listenBtn', 'meter', 'lipLbl', 'lipSens']) $(id).hidden = false;
-    tPaused = 0; updateMode(); modeEl.innerHTML = `<b>Song ready.</b> Press Play, or ✨ Auto-animate to build a script from it`;
+    for (const id of ['songInfo', 'autoBtn', 'autoMood', 'autoCamLbl', 'listenBtn', 'meter', 'lipLbl', 'lipSens']) $(id).hidden = false;
+    tPaused = 0; if (fresh) { autoTake = 0; runAuto(false); }
+    updateMode(); modeEl.innerHTML = fresh ? `<b>Animated to your song.</b> Press Play. ✨ Auto-animate again for a different take` : `<b>Song ready.</b> Your script is kept. ✨ Auto-animate replaces it with one built from the song`;
   } catch (x) {
     btn.textContent = 'Load song';
     err.textContent = `Couldn't play "${f.name}". Try an MP3, M4A/AAC or WAV file. Songs bought from Apple Music or Spotify are copy-protected and can't be loaded.`;
   }
 };
 $('lipSens').oninput = e => { lipSens = +e.target.value; if (song.an) buildMouth(song.an, lipSens); };
-$('autoBtn').onclick = () => { if (!song.an) return; code.value = autoScript(song.name || 'song'); rebuild(); code.scrollTop = 0; live = null; seek(0); updateMode(); };
+function runAuto(newTake) {   // each press is a new take; the options are read every time
+  if (!song.an) return; if (newTake) autoTake++;
+  code.value = autoScript(song.name || 'song', { mood: $('autoMood').value, camera: $('autoCam').checked, take: autoTake }); rebuild(); code.scrollTop = 0; live = null; seek(0); updateMode();
+}
+$('autoBtn').onclick = () => runAuto(true);
+$('autoMood').onchange = $('autoCam').onchange = () => runAuto(false);
 $('listenBtn').onclick = e => { listening = !listening; e.target.setAttribute('aria-pressed', listening); e.target.textContent = `Listening: ${listening ? 'on' : 'off'}`; };
 document.addEventListener('keydown', e => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); setPlaying(!playing); } });
 

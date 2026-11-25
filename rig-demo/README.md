@@ -50,7 +50,18 @@ With "Listening: on", the character reacts to the song:
 - the body squashes, bounces and flicks its ears on every beat
 - the tail wags with the song's energy, and the body sways on the beat
 
-"✨ Auto-animate" writes a whole script from the song's structure. It picks calmer styles and poses for quiet sections and glitch styles for big ones, changing on 4-bar boundaries.
+**One character per song (default).** With "One character for the whole song" ticked (Character tab), tapping a character makes it the star of the whole song, and character switches in any script are ignored. Untick it for multi-character videos, where the script's `who` / `character` switches apply.
+
+Loading a song **animates it automatically**: no script needed, just press Play. Auto-animate reads the song's sections, loudness and where the vocals are:
+- vocals get talk-to-camera poses and medium or close shots
+- instrumentals get dancing poses and wide shots
+- big sections get handheld shots and wilder styles
+
+Options next to the button:
+- **Styles:** follow the song, keep current, calm or wild.
+- **Camera moves:** on or off.
+
+Each press of ✨ is a new take. A script you've written yourself is never replaced on load.
 
 **Lip sync** uses a small singing detector trained on real songs; see `lipsync-training/`. For every 20 ms of audio it looks at:
 - tone colour (MFCCs)
