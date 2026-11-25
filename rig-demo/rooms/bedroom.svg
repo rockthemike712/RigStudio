@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
+  <!-- A layered room for Rig Studio. Each <g data-depth> is one paper layer:
+       0 = where the character stands, bigger = further back, negative = in front of the character.
+       Draw it as seen with the camera at rest. The character stands in the middle with its feet at y ≈ 905;
+       keep x 700–1220, y 250–905 clear. Fills by class: fur, white, pink, dark, side (or plain colours). -->
+
+  <!-- the back wall: window, poster, shelf -->
+  <g data-depth="900">
+    <line x1="-600" y1="690" x2="2520" y2="690"/>
+    <rect class="white" x="1220" y="170" width="400" height="300"/>
+    <line x1="1420" y1="170" x2="1420" y2="470"/>
+    <line x1="1220" y1="320" x2="1620" y2="320"/>
+    <circle class="white" cx="1540" cy="230" r="26"/>
+    <rect class="pink" x="330" y="170" width="220" height="290"/>
+    <path d="M360 430 L420 300 L470 380 L505 330 L530 430 Z"/>
+    <rect class="side" x="640" y="300" width="300" height="16"/>
+    <rect class="fur" x="660" y="240" width="40" height="60"/>
+    <rect class="pink" x="710" y="255" width="30" height="45"/>
+    <circle class="side" cx="800" cy="275" r="25"/>
+  </g>
+
+  <!-- the bed and a nightstand -->
+  <g data-depth="350">
+    <rect class="side" x="-40" y="420" width="120" height="380" rx="20"/>
+    <rect class="white" x="60" y="560" width="560" height="160" rx="30"/>
+    <rect class="pink" x="220" y="540" width="420" height="200" rx="40"/>
+    <rect class="white" x="80" y="520" width="150" height="70" rx="30"/>
+    <rect class="side" x="60" y="720" width="580" height="60"/>
+    <rect class="fur" x="1360" y="600" width="200" height="190" rx="12"/>
+    <line x1="1380" y1="690" x2="1540" y2="690"/>
+    <path class="white" d="M1410 600 L1510 600 L1485 500 L1435 500 Z"/>
+  </g>
+
+  <!-- a rug at the character's feet -->
+  <g data-depth="40">
+    <ellipse class="pink" cx="960" cy="915" rx="430" ry="70"/>
+    <ellipse cx="960" cy="915" rx="350" ry="52"/>
+  </g>
+
+  <!-- in front: the corner of a toy box -->
+  <g data-depth="-260">
+    <rect class="fur" x="1640" y="760" width="420" height="400" rx="30"/>
+    <line x1="1640" y1="860" x2="2060" y2="860"/>
+    <circle class="white" cx="1760" cy="740" r="60"/>
+  </g>
+</svg>
