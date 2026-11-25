@@ -98,8 +98,18 @@ This steps time frame by frame in headless Chromium and pipes the frames to ffmp
   - `viewBox="0 0 1920 1080"`, drawn as seen with the camera at rest.
   - One `<g data-depth="…">` per paper layer: `0` is where the character stands, bigger numbers are further back (a back wall is around 900, a skyline 2000+), negative numbers are in front of the character (around -250).
   - The character stands in the middle with its feet at y ≈ 905. Keep x 700–1220, y 250–905 clear, except for low things on the floor.
-  - Fills by class follow the style: `fur`, `white`, `pink`, `dark`, `side`. Plain colours also work; they're matched to the nearest role by how light they are. Shapes with no fill are line work.
+  - Fills by class follow the style: `fur`, `white`, `pink`, `dark`, `side`. Plain colours also work: dark ones become `dark`, colourful ones the accents (`fur` if warm, otherwise `pink`), and the rest `side` or `white` by lightness. Shapes with no fill are line work.
   - A prompt for an image AI: *"Write an SVG (viewBox 0 0 1920 1080) of a [cosy bedroom], flat cartoon style, plain shapes only (rect, circle, ellipse, polygon, path), no gradients, text or images. Split it into layers as `<g data-depth="N">`: the back wall at 900, furniture at 300–500, a rug on the floor at 40, and one prop poking in from a corner at -250. Leave the middle (x 700–1220, y 250–905) empty for a character who stands with feet at y 905. Give each filled shape class="white", "side", "fur", "pink" or "dark"."*
+- **A room from pictures:** `tools/png-to-room.mjs` turns a few layer images into a room SVG, so an image AI only has to draw pictures, not write SVG code. It traces each one with [openvector](https://github.com/Microck/openvector) (fetched on first use through `npx`; needs Node 22.19+):
+
+  ```sh
+  node rig-demo/tools/png-to-room.mjs my-room.svg wall.png:900:keep bed.png:350 rug.png:40 toybox.png:-250
+  ```
+
+  - Each argument is `picture:depth`, with depths as above. Draw every picture as the whole 16:9 frame seen with the camera at rest, with only that layer's things in it; transparent PNGs work best.
+  - A solid background is dropped automatically; `:keep` keeps it (for the back wall).
+  - Traced colours are kept. On import, dark shapes become `dark`, colourful ones the style's accents (warm → `fur`, others → `pink`), and the rest `side` or `white` by lightness. So every style still applies.
+  - Each picture takes about 8 seconds to trace. Then load the SVG with "Import SVG room…".
 - New room in code: add a function to `ROOMS` and list it in `ROOM_LIST`. It gets a helper `R` with `walls`, `plane`, `tint`, `line`, `rect`, `box` (real 3D, back faces culled) and `card` (a cut-out at a depth). Units match the character; `y` is up from the floor (negative), `z` is depth away from the camera.
 - New look: add an entry to `STYLES`. A style sets:
   - lines: colour, weight, jitter, passes, glow
