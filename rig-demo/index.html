@@ -63,6 +63,10 @@
   .sl input { width:100%; accent-color:var(--accent); }
   .sl output { font:11px var(--mono); color:var(--dim); text-align:right; font-variant-numeric:tabular-nums; }
   #deck { border-top:1px solid var(--line); padding:10px; display:grid; gap:8px; }
+  .row.pos { align-items:center; gap:6px; flex-wrap:nowrap; }
+  .row.pos button { flex:0 0 auto; padding:6px 13px; }
+  .row.pos output { min-width:24px; text-align:center; font-variant-numeric:tabular-nums; font-weight:600; }
+  .row.pos .lbl:last-of-type { margin-left:auto; }
   #mode { font-size:12px; color:var(--dim); }
   #mode b { color:var(--text); font-weight:600; }
   #mode.rec b { color:var(--rec); }
@@ -120,6 +124,10 @@
       <div class="tabbody" id="tabbody"></div>
       <div id="deck">
         <div id="mode"></div>
+        <div class="row pos" id="posRow" aria-label="Where in the song to add">
+          <span class="lbl">Bar</span><button id="barDn" aria-label="Previous bar">‹</button><output id="barOut">1</output><button id="barUp" aria-label="Next bar">›</button>
+          <span class="lbl">Beat</span><button id="beatDn" aria-label="Previous beat">‹</button><output id="beatOut">1</output><button id="beatUp" aria-label="Next beat">›</button>
+        </div>
         <div class="row" id="liveBtns" hidden>
           <button id="addBtn" class="primary">Add to script</button>
           <button id="discardBtn">Back to script</button>
@@ -1749,9 +1757,15 @@ function liveDiff() {
   if (Object.keys(live.set).length) d.set = live.set;
   return d;
 }
+// choosing where an edit lands: step the playhead by bars or beats from the deck (no need to reach the timeline)
+function gotoBeat(total) { total = Math.max(0, total); seek(beatOffset() + total * spb()); updateMode(); }
+function stepBeats(n) { const [bar, beat] = barBeat(now(), 1); gotoBeat((bar - 1) * bpb() + Math.round(beat) - 1 + n); }
+$('barDn').onclick = () => stepBeats(-bpb()); $('barUp').onclick = () => stepBeats(bpb());
+$('beatDn').onclick = () => stepBeats(-1); $('beatUp').onclick = () => stepBeats(1);
 addBtn.onclick = () => {
-  const d = liveDiff(); if (!Object.keys(d).length) return;
-  insertEvent(barBeat(now(), 1), d); live = null; updateMode();
+  let d = liveDiff(); if (!Object.keys(d).length) d = { pose: live.pose };   // same as the script here: still write it, so it holds from this beat
+  insertEvent(barBeat(now(), 1), d); live = null;
+  stepBeats(1);   // move on a beat, so the next change lands after this one
 };
 $('discardBtn').onclick = () => { live = null; updateMode(); refreshThumbs(true); };
 let flashUntil = 0;
@@ -1764,6 +1778,7 @@ function updateMode() {
   else modeEl.innerHTML = `<b>Paused</b> at bar ${at[0]}, beat ${at[1]} · click anything to preview it`;
   liveBtns.hidden = !live;
   if (live) addBtn.textContent = `Add at bar ${at[0]}, beat ${at[1]}`;
+  $('posRow').hidden = playing; const pb = barBeat(now(), 1); $('barOut').textContent = pb[0]; $('beatOut').textContent = Math.round(pb[1]);
 }
 
 /* ----- panels ----- */
