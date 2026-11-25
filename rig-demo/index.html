@@ -53,6 +53,8 @@
   .tile span { padding:5px 8px; font-size:12px; color:var(--dim); }
   .tile[aria-pressed=true] { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
   .tile[aria-pressed=true] span { color:var(--text); }
+  .cat { display:flex; justify-content:space-between; color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.08em; margin:14px 2px 8px; border-top:1px solid var(--line); padding-top:10px; }
+  .cat:first-child { margin-top:2px; border-top:0; padding-top:0; }
   .tile.import { justify-content:center; align-items:center; min-height:96px; border-style:dashed; }
   fieldset { border:0; padding:0; margin:0 0 14px; display:grid; gap:6px; }
   legend { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
@@ -143,6 +145,8 @@ const BASE = {
   lhX:-160, lhY:70, lhR:0, rhX:160, rhY:70, rhR:0, wave:0,
   // extra channels some characters use (others just ignore them)
   earL:0, earR:0, tailWag:1, tongue:0,
+  // camera, body build, hand shapes
+  camY:0, shake:0, bw:1, bh:1, handL:0, handR:0, eyeScale:1,
 };
 
 const POSES = {
@@ -160,6 +164,94 @@ const POSES = {
 };
 
 const allFills = color => ({ body: color, side: color, dark: color, eyeWhite: color, hand: color, fur: color, white: color, pink: color, iris: color });
+
+/* ---------- the pose library (names follow the reference video) ----------
+   Whole-body poses replace the previous pose. Poses marked layer:true (eyes-, mouth-, hand poses) are laid on top of it. */
+// hand shapes: 0 mitten, 1 fist, 2 point, 3 five, 4 thumbs up, 5 two, 6 three, 7 palm up
+Object.assign(POSES, {
+  // attitudes
+  'at-ease':  { tilt:-2, lookX:-3, mouthCurve:6, lhY:80, rhY:80 },
+  selling:    { mouthCurve:18, mouthW:38, mouthOpen:8, eyeOpen:.9, browY:-86, rhX:150, rhY:10, rhR:-30, handR:7, tilt:-5, lookX:6 },
+  doubtful:   { browTilt:12, mouthCurve:-4, mouthW:20, lookX:-8, lookY:-4, tilt:6, lhX:-120, lhY:90, handL:1 },
+  alarmed:    { eyeOpen:1.4, eyeSize:23, browY:-104, mouthOpen:16, mouthW:18, mouthCurve:-4, squash:1.05, bx:-20, tilt:-6, lhX:-175, lhY:-20, rhX:175, rhY:-20, handL:3, handR:3, earL:12, earR:-12 },
+  beaten:     { eyeOpen:.55, lookY:8, browInner:-16, mouthCurve:-12, squash:.92, tilt:5, lhY:130, rhY:130, earL:-45, earR:45, tailWag:0 },
+  pleased:    { eyeOpen:.5, mouthCurve:18, mouthW:32, browY:-84, squash:1.03, tilt:-3, lhX:-140, lhY:60, rhX:140, rhY:60, handL:1, handR:1, tailWag:1.8 },
+  fedup:      { eyeOpen:.45, browInner:6, mouthCurve:-6, mouthW:26, tilt:-4, lookX:6, lhX:-110, lhY:40, rhX:110, rhY:40, lhR:30, rhR:-30, handL:7, handR:7 },
+  secret:     { lookX:-10, eyeOpen:.7, mouthCurve:4, mouthW:14, mouthOpen:4, tilt:-8, bx:-25, rhX:60, rhY:20, rhR:-60, handR:3, earL:-8 },
+  you:        { lookX:10, browY:-84, mouthCurve:12, tilt:4, rhX:185, rhY:20, rhR:-80, handR:2 },
+  counting:   { lookY:-6, lookX:4, mouthCurve:4, browTilt:6, rhX:150, rhY:-10, handR:6, lhX:-150, lhY:60 },
+  dunno:      { browY:-96, browInner:-10, mouthCurve:-8, mouthW:22, squash:.95, tilt:-3, lhX:-185, lhY:20, rhX:185, rhY:20, lhR:60, rhR:-60, handL:7, handR:7 },
+  despair:    { eyeOpen:.3, browInner:-22, mouthOpen:10, mouthCurve:-14, squash:.9, tilt:10, lhX:-60, lhY:-40, rhX:60, rhY:-40, handL:3, handR:3, earL:-50, earR:50, tailWag:0 },
+  deal:       { mouthCurve:16, eyeOpen:.8, browY:-86, lookX:6, rhX:170, rhY:40, rhR:-10, handR:4, tilt:-4, tailWag:1.5 },
+  letter:     { lookX:6, lookY:6, mouthCurve:2, browTilt:4, lhX:-60, lhY:60, rhX:60, rhY:60, handL:1, handR:1, tilt:2 },
+  // feelings
+  'feel-happy':      { mouthCurve:18, mouthOpen:10, mouthW:36, eyeOpen:.75, browY:-88, bounce:6, tongue:.8, tailWag:2.2 },
+  'feel-excited':    { eyeOpen:1.25, eyeSize:22, mouthOpen:20, mouthCurve:14, browY:-100, bounce:14, lhX:-170, lhY:-50, rhX:170, rhY:-50, handL:3, handR:3, tailWag:3, tongue:1 },
+  'feel-furious':    { eyeOpen:.65, eyeSize:16, browInner:26, browY:-68, mouthCurve:-16, mouthOpen:10, squash:.92, lhY:100, rhY:100, handL:1, handR:1, earL:-40, earR:40, tailWag:0 },
+  'feel-sulking':    { eyeOpen:.5, lookX:-10, lookY:5, browInner:-6, mouthCurve:-10, mouthW:16, tilt:-7, lhX:-70, lhY:70, rhX:70, rhY:70, earL:-30, earR:30, tailWag:0 },
+  'feel-flirting':   { eyeOpen:.55, lookX:8, browTilt:-8, mouthCurve:14, mouthW:22, tilt:7, bx:10, rhX:120, rhY:-10, rhR:-40, handR:3, tailWag:2 },
+  'feel-bored':      { eyeOpen:.35, lookY:4, browY:-74, mouthCurve:-2, mouthW:18, tilt:9, squash:.97, lhY:120, rhY:120, earL:-20, earR:20, tailWag:.2 },
+  'feel-terrified':  { eyeOpen:1.45, eyeSize:24, browInner:-20, browY:-104, mouthOpen:22, mouthW:20, mouthCurve:-10, squash:.94, bx:-30, lhX:-80, lhY:-10, rhX:80, rhY:-10, handL:3, handR:3, earL:-45, earR:45 },
+  'feel-proud':      { eyeOpen:.6, mouthCurve:12, browY:-88, squash:1.06, by:-6, tilt:-4, lhX:-120, lhY:40, rhX:120, rhY:40, lhR:40, rhR:-40, handL:1, handR:1, tailWag:1.5 },
+  'feel-embarrassed':{ eyeOpen:.6, lookX:-10, lookY:6, browInner:-12, mouthCurve:4, mouthW:14, tilt:-8, squash:.96, lhX:-60, lhY:20, rhX:60, rhY:20, handL:3, handR:3 },
+  'feel-laughing':   { eyeOpen:.15, mouthOpen:28, mouthCurve:18, mouthW:42, browY:-92, bounce:12, tilt:-6, lhY:40, rhY:40, tongue:1, tailWag:3 },
+  'feel-crying':     { eyeOpen:.2, browInner:-24, mouthOpen:14, mouthCurve:-16, mouthW:26, squash:.94, lhX:-50, lhY:-20, rhX:50, rhY:-20, handL:1, handR:1, earL:-45, earR:45, tailWag:0 },
+  'feel-plotting':   { eyeOpen:.45, lookX:-8, browInner:16, browTilt:-6, mouthCurve:10, mouthW:24, tilt:-5, lhX:-50, lhY:30, rhX:50, rhY:30, handL:3, handR:3, tailWag:.5 },
+  // eyes (layered)
+  'eyes-suspicious': { layer:true, eyeOpen:.38, lookX:-10, browInner:10 },
+  'eyes-sad':        { layer:true, eyeOpen:.7, lookY:6, browInner:-16 },
+  'eyes-sleepy':     { layer:true, eyeOpen:.2, browY:-72 },
+  'eyes-furious':    { layer:true, eyeOpen:.65, browInner:24, browY:-70 },
+  'eyes-wide':       { layer:true, eyeOpen:1.4, browY:-102 },
+  'eyes-happy':      { layer:true, eyeOpen:.18, mouthCurve:12 },
+  // mouths (layered)
+  'mouth-gasp':      { layer:true, mouthOpen:22, mouthW:16, mouthCurve:0 },
+  'mouth-happy':     { layer:true, mouthCurve:18, mouthW:36, mouthOpen:6 },
+  'mouth-smirk':     { layer:true, mouthCurve:10, mouthW:22, browTilt:8 },
+  'mouth-oo':        { layer:true, mouthOpen:10, mouthW:10, mouthCurve:0 },
+  'mouth-flat':      { layer:true, mouthCurve:0, mouthOpen:0, mouthW:24 },
+  // hands (layered)
+  count1:    { layer:true, rhX:150, rhY:-20, rhR:0, handR:2 },
+  count2:    { layer:true, rhX:150, rhY:-20, rhR:0, handR:5 },
+  count3:    { layer:true, rhX:150, rhY:-20, rhR:0, handR:6 },
+  count4:    { layer:true, rhX:150, rhY:-20, rhR:0, handR:3 },
+  shrug:     { layer:true, lhX:-185, lhY:20, rhX:185, rhY:20, lhR:60, rhR:-60, handL:7, handR:7, browY:-94 },
+  'point-you':{ layer:true, rhX:185, rhY:30, rhR:-85, handR:2 },
+  thumbsup:  { layer:true, rhX:165, rhY:20, rhR:0, handR:4 },
+  wave:      { layer:true, rhX:175, rhY:-70, rhR:-20, wave:1, handR:3 },
+  fist:      { layer:true, handL:1, handR:1 },
+  stop:      { layer:true, rhX:170, rhY:0, rhR:0, handR:3 },
+  facepalm:  { layer:true, rhX:30, rhY:-40, rhR:-20, handR:3, eyeOpen:.2 },
+});
+const POSE_CATS = [
+  ['Classic', ['neutral', 'smiling', 'waving', 'thinking', 'laughing', 'suspicious', 'furious', 'surprised', 'sad', 'happy', 'sleepy']],
+  ['Attitudes', ['at-ease', 'selling', 'doubtful', 'alarmed', 'beaten', 'pleased', 'fedup', 'secret', 'you', 'counting', 'dunno', 'despair', 'deal', 'letter']],
+  ['Feelings', ['feel-happy', 'feel-excited', 'feel-furious', 'feel-sulking', 'feel-flirting', 'feel-bored', 'feel-terrified', 'feel-proud', 'feel-embarrassed', 'feel-laughing', 'feel-crying', 'feel-plotting']],
+  ['Eyes', ['eyes-suspicious', 'eyes-sad', 'eyes-sleepy', 'eyes-furious', 'eyes-wide', 'eyes-happy']],
+  ['Mouth', ['mouth-gasp', 'mouth-happy', 'mouth-smirk', 'mouth-oo', 'mouth-flat']],
+  ['Hands', ['count1', 'count2', 'count3', 'count4', 'shrug', 'point-you', 'thumbsup', 'wave', 'fist', 'stop', 'facepalm']],
+];
+const LAYER_KEYS = new Set(Object.keys(BASE));
+const poseParams = name => { const p = { ...POSES[name] }; delete p.layer; return p; };
+
+/* ---------- cast: the fridge in different builds (the video's "who") ---------- */
+const CAST = {
+  doug:      { label:'Doug', bw:1, bh:1 },
+  child:     { label:'Child', bw:.82, bh:.68, eyeScale:1.25 },
+  girl:      { label:'Girl', bw:.86, bh:1.02, eyeScale:1.12, browW:.8 },
+  teen:      { label:'Teen', bw:.78, bh:1.18, eyeScale:1.05 },
+  boss:      { label:'Boss', bw:1.38, bh:.96, browW:1.9, eyeScale:.9 },
+  clerk:     { label:'Clerk', bw:.9, bh:1.1, eyeScale:.82, browW:.7 },
+  oldman:    { label:'Old man', bw:.74, bh:1.36, eyeScale:.85, browW:1.5 },
+  professor: { label:'Professor', bw:.92, bh:1.3, eyeScale:.9, browW:1.3 },
+  bouncer:   { label:'Bouncer', bw:1.62, bh:1.18, eyeScale:.75, browW:2 },
+  dancer:    { label:'Dancer', bw:.7, bh:1.24, eyeScale:1.05 },
+};
+const CAMERAS = { 1:{ zoom:1, camY:0, shake:0 }, full:{ zoom:1, camY:0, shake:0 }, 2:{ zoom:1.85, camY:105, shake:0 }, close:{ zoom:1.85, camY:105, shake:0 },
+  3:{ zoom:1.35, camY:55, shake:0 }, medium:{ zoom:1.35, camY:55, shake:0 }, 4:{ zoom:1.12, camY:15, shake:1 }, handheld:{ zoom:1.12, camY:15, shake:1 } };
+const SET_ALIASES = { 'body.w':['bw', 1], 'body.h':['bh', 1], 'body.d':['bw', 1], 'eyes.size':['eyeScale', 6.3], 'eyes.spacing':['eyeGap', 96], 'eyes.aspect':['eyeOpen', 1.4],
+  'brows.thick':['browW', 18], 'brows.len':['browW', 4], 'mouth.open':['mouthOpen', 30], 'mouth.smile':['mouthCurve', 20] };
+
 const STYLES = {
   pencil:    { bg:'#efede6', ink:'rgba(38,38,44,.82)', w:2.3, jitter:2.4, passes:2, guides:'rgba(70,115,205,.32)', shadow:'rgba(0,0,0,.10)',
                fills:{ dark:'rgba(38,38,44,.85)', eyeWhite:'#efede6', iris:'rgba(38,38,44,.7)', fur:'BG', white:'BG', pink:'rgba(38,38,44,.12)' } },
@@ -226,6 +318,241 @@ const STYLES = {
 };
 // 'BG' = paint with the background colour, so sketch styles still hide lines that are behind a shape
 
+
+/* ---------- the style catalogue (categories follow the reference video) ---------- */
+// PAL(): one palette description → fills for every role both characters use
+const PAL = m => ({ fur: m.main, white: m.light ?? '#ffffff', pink: m.accent, side: m.shade, body: m.body ?? m.light ?? '#ffffff', hand: m.hand ?? m.accent ?? m.light,
+  dark: m.dark ?? '#151515', eyeWhite: m.eye ?? '#ffffff', iris: m.iris ?? m.dark ?? '#151515' });
+const HT = (c, o = {}) => ({ hatch: c, angle: 40, gap: 7, lw: 1.5, ...o });
+const GR = (...c) => ({ grad: c, angle: 90 });
+const NEWSTYLES = {
+  // DRAWN
+  ballpoint: { bg:'#f4f1e8', bgFx:'lined', ink:'#1f3a9e', w:1.6, jitter:1.4, passes:3, shadow:'rgba(31,58,158,.12)',
+               fills:PAL({ main:HT('rgba(31,58,158,.6)', { base:'#f4f1e8' }), light:'#f4f1e8', shade:HT('rgba(31,58,158,.6)', { gap:5, cross:true }), accent:HT('rgba(31,58,158,.45)', { angle:-30, gap:6 }),
+                          body:HT('rgba(31,58,158,.22)', { gap:12, base:'#f4f1e8' }), dark:'#1f3a9e', eye:'#f4f1e8' }) },
+  felttip:   { bg:'#fbfaf5', ink:'#1b1b1b', w:4, jitter:1.6, passes:1, shadow:'rgba(0,0,0,.08)',
+               fills:PAL({ main:{ base:'#fbfaf5', scribble:'rgba(30,170,90,.85)', lw:10, step:13 }, light:{ base:'#fbfaf5', scribble:'rgba(40,150,230,.75)', lw:10, step:13 },
+                          shade:{ scribble:'rgba(20,80,200,.9)', lw:10, step:11 }, accent:{ scribble:'rgba(240,80,60,.9)', lw:9, step:11 }, body:{ base:'#fbfaf5', scribble:'rgba(40,150,230,.75)', lw:10, step:13 } }) },
+  inkbleed:  { bg:'#f6f2e8', ink:'#26323a', w:2.8, jitter:1.3, passes:1, post:[['soften', { a:.45 }]], shadow:'rgba(40,60,80,.15)',
+               fills:PAL({ main:'PAINT_WARM', light:GR('#d6e8f7', '#f6f2e8'), shade:'rgba(40,80,140,.6)', accent:'#e0607a', body:'PAINT', hand:'#e8a93a' }) },
+  // PRINT AND PASTE
+  assembly:  { bg:'#ece6da', ink:'#3a3a3a', w:1.4, jitter:2.4, passes:1, grain:.2, shapeShadow:'rgba(60,40,20,.35)', shadow:'rgba(60,40,20,.15)',
+               fills:PAL({ main:'#c9a47c', light:'#f6f2ea', shade:'#8fa1ad', accent:'#d98c7a', body:'#e2dccd', hand:'#b9c7a8' }) },
+  stencil:   { bg:'#d9d4cb', bgFx:'wall', ink:'#d9d4cb', w:3, jitter:.4, passes:1, grain:.28, shadow:'rgba(0,0,0,.12)',
+               fills:PAL({ main:{ spray:'#1a1a1a' }, light:'#d9d4cb', shade:{ spray:'#1a1a1a' }, accent:{ spray:'#c8102e' }, body:{ spray:'#1a1a1a' }, hand:{ spray:'#1a1a1a' }, dark:'#1a1a1a', eye:'#d9d4cb', iris:'#1a1a1a' }) },
+  photocopy: { bg:'#f0eee8', ink:'#111', w:3.4, jitter:1, passes:1, shadow:'rgba(0,0,0,.25)', post:[['threshold', { level:.6, noise:.45 }], 'copy'],
+               fills:PAL({ main:'#8a8a8a', light:'#e8e8e8', shade:'#555', accent:'#9a9a9a', body:'#e0e0e0' }) },
+  posters:   { bg:'#2457c5', ink:'#111', w:5, jitter:.5, passes:1, grain:.22, post:['wrinkle'], shadow:'rgba(0,0,0,.2)',
+               fills:PAL({ main:'#ffd400', light:'#fff7cc', shade:'#e05a2b', accent:'#ff4d8d', body:'#ffd400', hand:'#ff4d8d' }) },
+  gigposter: { bg:'#f1e6cf', ink:'#2a1a12', w:3, jitter:.5, passes:1, grain:.25, shadow:'rgba(242,107,44,.25)',
+               layers:[ { comp:'multiply', ink:'#f26b2c', fills:{ ...allFills('#ffffff'), fur:'#f26b2c', body:'#f26b2c', pink:'#f26b2c', hand:'#f26b2c', dark:'#f26b2c' } },
+                        { comp:'multiply', ink:'#1f8a8a', offset:[7, 4], shadow:null, fills:{ ...allFills('#ffffff'), fur:{ base:'#ffffff', dots:'#1f8a8a', size:12 }, side:'#1f8a8a', white:{ base:'#ffffff', dots:'#1f8a8a', size:16 }, dark:'#1f8a8a', iris:'#1f8a8a' } },
+                        { shadow:null, fills:{ dark:'#2a1a12', iris:'#2a1a12' } } ] },
+  twotone:   { bg:'#f2f2f2', bgFx:'checker', ink:'#111', w:6, jitter:0, passes:1, shadow:'rgba(0,0,0,.2)',
+               fills:PAL({ main:'#111', light:'#f2f2f2', shade:'#111', accent:'#111', body:'#f2f2f2', hand:'#f2f2f2', eye:'#f2f2f2' }) },
+  industrial:{ bg:'#d7d8d6', bgFx:'tech', ink:'#2b2b2b', w:1.5, jitter:0, passes:1, shadow:'rgba(0,0,0,.12)',
+               fills:PAL({ main:'#9fa3a6', light:'#ecedeb', shade:'#7d8285', accent:'#ff5a1f', body:'#ecedeb', hand:'#c9cbc8' }) },
+  bleakink:  { bg:'#ecebe6', ink:'#111', w:2.2, jitter:1.8, passes:1, grain:.15, shadow:'rgba(0,0,0,.1)',
+               fills:PAL({ main:GR('rgba(40,40,40,.45)', 'rgba(40,40,40,.05)'), light:'#ecebe6', shade:'rgba(0,0,0,.5)', accent:'rgba(0,0,0,.2)', body:'#ecebe6', hand:'#ecebe6' }) },
+  // COMICS
+  manga:     { bg:'#ffffff', bgFx:'speed', ink:'#111', w:3.2, jitter:.2, passes:1, shadow:'rgba(0,0,0,.15)',
+               fills:PAL({ main:{ base:'#fff', dots:'#111', size:7 }, light:'#fff', shade:{ base:'#fff', dots:'#111', size:5 }, accent:{ base:'#fff', dots:'#111', size:9 }, body:'#fff', hand:'#fff' }) },
+  comiccg:   { bg:'#e9eef8', ink:'#151515', w:5, jitter:0, passes:1, post:[['bloom', { a:.25 }]], shadow:'rgba(0,0,40,.2)',
+               fills:PAL({ main:GR('#ffb25a', '#e2621f', '#9b3810'), light:GR('#ffffff', '#d4def0'), shade:GR('#7a8db3', '#33405f'), accent:GR('#ff9bd0', '#d0407a'), body:GR('#ffffff', '#c5d3ec'), hand:GR('#ffe08a', '#e89a1a') }) },
+  manga60:   { bg:'#f7f3ea', ink:'#222', w:4.2, jitter:.4, passes:1, grain:.15, shadow:'rgba(0,0,0,.12)',
+               fills:PAL({ main:{ base:'#f7f3ea', dots:'rgba(0,0,0,.6)', size:11 }, light:'#f7f3ea', shade:'#b8b8b8', accent:'#dedede', body:'#f7f3ea', hand:'#f7f3ea' }) },
+  indie2000: { bg:'#efe9dc', ink:'#3b342c', w:2, jitter:2.2, passes:1, grain:.1, shadow:'rgba(0,0,0,.1)',
+               fills:PAL({ main:'#c98a5a', light:'#f2ece0', shade:'#8a9a8c', accent:'#d9a0a0', body:'#e6dccb', hand:'#e8cfa0' }) },
+  spotblacks:{ bg:'#ffffff', ink:'#000', w:5.5, jitter:0, passes:1, shadow:'rgba(0,0,0,.25)',
+               fills:PAL({ main:'#000', light:'#fff', shade:'#000', accent:'#000', body:'#fff', hand:'#fff', eye:'#fff' }) },
+  feathered: { bg:'#fbf8f0', ink:'#141414', w:3, jitter:.6, passes:1, shadow:'rgba(0,0,0,.12)',
+               fills:PAL({ main:HT('#141414', { angle:70, gap:8, lw:2.4, base:'#fbf8f0' }), light:'#fbf8f0', shade:HT('#141414', { angle:70, gap:5, lw:2.6, cross:true, base:'#fbf8f0' }), accent:HT('#141414', { angle:-20, gap:9 }), body:'#fbf8f0', hand:'#fbf8f0' }) },
+  extreme90: { bg:'#2a1b4a', ink:'#000', w:6, jitter:.4, passes:1, post:['vignette'], shadow:'rgba(0,0,0,.4)',
+               fills:PAL({ main:GR('#7b4dff', '#2d1580'), light:GR('#e6e6ff', '#8f8fd0'), shade:HT('#000', { base:'#1b0f3a', gap:5, cross:true }), accent:'#ff2e6a', body:GR('#6fd3ff', '#2a59a8'), hand:GR('#ffe066', '#e09a00') }) },
+  techmanga: { bg:'#fdfdfb', ink:'#222', w:1.6, jitter:0, passes:1, shadow:'rgba(0,0,0,.1)',
+               fills:PAL({ main:{ base:'#fff', dots:'#333', size:5 }, light:'#fff', shade:HT('#222', { angle:45, gap:4, lw:1, base:'#fff' }), accent:{ base:'#fff', dots:'#333', size:4 }, body:'#fff', hand:'#fff' }) },
+  oilstick:  { bg:'#f3ecdc', ink:'#111', w:6, jitter:3, passes:2, grain:.12, shadow:'rgba(0,0,0,.1)',
+               fills:PAL({ main:{ base:'#f3ecdc', scribble:'rgba(255,60,40,.9)', lw:13, step:17 }, light:{ base:'#f3ecdc', scribble:'rgba(40,120,255,.85)', lw:13, step:17 }, shade:{ scribble:'rgba(255,210,0,.9)', lw:12, step:14 },
+                          accent:{ scribble:'rgba(30,200,90,.9)', lw:11, step:12 }, body:{ base:'#f3ecdc', scribble:'rgba(40,120,255,.85)', lw:13, step:17 } }) },
+  linescreen:{ bg:'#f4f1e8', ink:'#111', w:3, jitter:.2, passes:1, shadow:'rgba(0,0,0,.3)', post:[['linescreen', { period:10, dark:'#16233b', light:'#f4f1e8' }]],
+               fills:PAL({ main:'#7a7a7a', light:'#eeeeee', shade:'#4a4a4a', accent:'#a5a5a5', body:'#dddddd', hand:'#bbbbbb' }) },
+  // SPOOKY
+  ghost:     { bg:'#1b2335', bgFx:'fog', ink:'rgba(230,236,255,.85)', w:2.4, jitter:1, passes:1, float:true, post:[['bloom', { a:.45 }]], shadow:'rgba(0,0,0,.35)',
+               fills:PAL({ main:'rgba(235,240,255,.8)', light:'rgba(255,255,255,.88)', shade:'rgba(200,210,240,.55)', accent:'rgba(220,225,255,.7)', body:'rgba(240,244,255,.82)', dark:'#0b0f1a', eye:'#0b0f1a', iris:'#0b0f1a' }) },
+  glowdark:  { bg:'#06120c', ink:'#7dffb0', w:2.6, glow:22, jitter:.4, passes:1, post:['bloom'], shadow:'rgba(125,255,176,.12)',
+               fills:PAL({ main:'rgba(125,255,176,.35)', light:'rgba(180,255,210,.45)', shade:'rgba(80,200,130,.3)', accent:'rgba(125,255,176,.5)', body:'rgba(160,255,200,.38)', dark:'#06120c', eye:'#06120c', iris:'#7dffb0' }) },
+  skeleton:  { bg:'#0d0d0d', ink:'#f0f0f0', w:4, jitter:.8, passes:1, jiggle:true, grain:.3, post:[['gradmap', { stops:['#0b0b0b', '#f2efe6'] }], 'film'], shadow:'rgba(255,255,255,.08)',
+               fills:PAL({ main:'#111', light:'#f0f0f0', shade:'#222', accent:'#f0f0f0', body:'#111', hand:'#f0f0f0', eye:'#f0f0f0', iris:'#111', dark:'#f0f0f0' }) },
+  macabre:   { bg:'#e9e4d8', ink:'#111', w:2.4, jitter:1, passes:1, post:[['vignette', { color:'rgba(0,0,0,.6)' }]], shadow:'rgba(0,0,0,.25)',
+               fills:PAL({ main:HT('#111', { base:'#e9e4d8', gap:5, cross:true }), light:HT('#111', { base:'#e9e4d8', gap:10 }), shade:'#111', accent:HT('#111', { gap:4, angle:-45 }), body:HT('#111', { base:'#e9e4d8', gap:9 }), hand:HT('#111', { base:'#e9e4d8', gap:8 }) }) },
+  monster:   { bg:'#0b1a0d', bgFx:'monster', ink:'#140d1f', w:4.5, jitter:.5, passes:1, grain:.25, post:['vignette'], shadow:'rgba(0,0,0,.4)',
+               fills:PAL({ main:GR('#a6ff4d', '#2e7d1f'), light:GR('#f2e6a6', '#b9a35b'), shade:'#3b1f4a', accent:'#d22b2b', body:GR('#c4ff7a', '#3e8a2a'), hand:GR('#f2e6a6', '#b9a35b') }) },
+  shadow:    { bg:'#e7e3da', ink:'#0c0c0c', w:3, jitter:.6, passes:1, shadow:null,
+               fills:{ ...allFills('#0c0c0c'), eyeWhite:'#f4f4f4', iris:'#0c0c0c' },
+               layers:[ { offset:[80, 24], ink:'rgba(0,0,0,.2)', comp:'multiply', fills:allFills('rgba(0,0,0,.2)') }, {} ] },
+  eviltwin:  { bg:'#120507', ink:'#ff2a2a', w:3, glow:14, jitter:.6, passes:1, post:['bloom', 'vignette'], shadow:'rgba(255,0,0,.12)',
+               fills:PAL({ main:'#2a0a0e', light:'#3a0d12', shade:'#1a0508', accent:'#ff2a2a', body:'#2a0a0e', hand:'#3a0d12', dark:'#ff2a2a', eye:'#ff2a2a', iris:'#120507' }) },
+  soulfire:  { bg:'#0a0606', ink:'#ffb347', w:2.8, glow:24, jitter:.8, passes:1, post:['bloom', ['wobble', { amp:4 }]], shadow:'rgba(255,120,0,.15)',
+               fills:PAL({ main:GR('#fff3b0', '#ff8c1a', '#c21f00'), light:GR('#ffffff', '#ffd27a'), shade:'#7a1200', accent:'#ff4d00', body:GR('#fff3b0', '#ff8c1a', '#c21f00'), hand:GR('#fff3b0', '#ff8c1a'), dark:'#0a0606', eye:'#fff3b0' }) },
+  nightvision:{ bg:'#3a3a3a', ink:'#111', w:3, jitter:.3, passes:1, post:['nightvision'], shadow:'rgba(0,0,0,.3)',
+               fills:PAL({ main:'#b0b0b0', light:'#e8e8e8', shade:'#777', accent:'#d0d0d0', body:'#d8d8d8', hand:'#c8c8c8', eye:'#fff' }) },
+  horrorvhs: { bg:'#140608', bgFx:'storm', ink:'#e8e1d0', w:3, jitter:.5, passes:1, grain:.2, post:['vhs', 'vignette'], shadow:'rgba(0,0,0,.4)',
+               fills:PAL({ main:'#5a0f14', light:'#d9d0bd', shade:'#2a0508', accent:'#c21f1f', body:'#3a0a0e', hand:'#d9d0bd', dark:'#0a0203', eye:'#ffe9a8', iris:'#c21f1f' }) },
+  analoghorror:{ bg:'#7b7f80', ink:'#1a1a1a', w:3, jitter:1.2, passes:1, pixel:3, post:[['posterize', { levels:5 }], ['gradmap', { stops:['#101418', '#5b6570', '#c9d1c8'] }], 'vhs'], shadow:'rgba(0,0,0,.3)',
+               fills:PAL({ main:'#8a8a8a', light:'#c8c8c8', shade:'#4a4a4a', accent:'#9a7070', body:'#bdbdbd', hand:'#aaaaaa', eye:'#fff' }) },
+  spirit:    { bg:'#d9c9a8', ink:'#3b2a1a', w:2.4, jitter:.6, passes:1, float:true, grain:.3, post:['motion', ['gradmap', { stops:['#2a1a0e', '#8a6a44', '#efe2c4'] }], 'vignette'], shadow:'rgba(60,40,20,.2)',
+               fills:PAL({ main:'rgba(140,110,80,.55)', light:'rgba(250,240,220,.6)', shade:'rgba(90,70,50,.5)', accent:'rgba(160,120,90,.5)', body:'rgba(245,235,215,.6)', hand:'rgba(245,235,215,.6)' }) },
+  blacklight:{ bg:'#14002b', bgFx:'stars', ink:'#e6ff00', w:3, glow:16, jitter:.4, passes:1, post:['bloom'], shadow:'rgba(230,255,0,.1)',
+               fills:PAL({ main:'#ff2bd6', light:'#00f0ff', shade:'#7d00ff', accent:'#e6ff00', body:'#00f0ff', hand:'#e6ff00', dark:'#14002b', eye:'#e6ff00' }) },
+  // 1980s AND 1990s
+  chrome:    { bg:'#1b1446', bgFx:'sunset', ink:'#1a1030', w:3, jitter:0, passes:1, post:['sparkle'], shadow:'rgba(0,0,0,.35)',
+               fills:PAL({ main:GR('#ffffff', '#9ad7ff', '#1e3c72', '#ffd6a6', '#ffffff'), light:GR('#ffffff', '#c8d6e5', '#5a6b85', '#ffffff'), shade:GR('#7a8cad', '#1b2540'),
+                          accent:GR('#ff8fd8', '#7a1fa2'), body:GR('#ffffff', '#9ad7ff', '#1e3c72', '#ffd6a6', '#ffffff'), hand:GR('#ff8fd8', '#7a1fa2') }) },
+  skatedeck: { bg:'#f4e04d', bgFx:'splatter', ink:'#111', w:7, jitter:.6, passes:1, grain:.12, shadow:'rgba(0,0,0,.25)',
+               fills:PAL({ main:'#e8392c', light:'#ffffff', shade:'#111', accent:'#2fb5e8', body:'#ffffff', hand:'#2fb5e8' }) },
+  toypack:   { bg:'#1c4fd8', bgFx:'starburst', ink:'#0b1340', w:5, jitter:0, passes:1, post:[['bloom', { a:.2 }]], shadow:'rgba(0,0,0,.3)',
+               fills:PAL({ main:GR('#ffc46b', '#e86a17'), light:GR('#ffffff', '#d8e7ff'), shade:'#8e3d0e', accent:'#ff3b6f', body:GR('#ffffff', '#cfe0ff'), hand:GR('#ffe066', '#ff9a1a') }) },
+  wireframe: { bg:'#05040a', bgFx:'synthgrid', ink:'#00ffd5', w:2, glow:14, jitter:0, passes:1, guides:'rgba(0,255,213,.35)',
+               fills:{ dark:'#00ffd5', eyeWhite:'#05040a', iris:'#00ffd5' } },
+  videosynth:{ bg:'#000', ink:'HUE', w:3, glow:12, jitter:.3, passes:1, post:[['trails', { decay:.86, zoom:1.03, rot:.012, mode:'lighten' }], 'scanlines'],
+               fills:PAL({ main:{ rainbow:true }, light:{ rainbow:true, hue:180 }, shade:{ rainbow:true, hue:90 }, accent:{ rainbow:true, hue:270 }, body:{ rainbow:true, hue:200 }, hand:{ rainbow:true, hue:40 }, dark:'#000', eye:'#000', iris:'#fff' }) },
+  cghead:    { bg:'#0a1240', bgFx:'cggrid', ink:'#0a0a20', w:2, jitter:0, passes:1, post:['scanlines', ['bloom', { a:.2 }]], shadow:'rgba(0,0,0,.4)',
+               fills:PAL({ main:GR('#ffe2b8', '#d98952', '#6b2f12'), light:GR('#ffffff', '#b9c6e6', '#4a5a8a'), shade:'#203070', accent:GR('#ff9bd0', '#a0205a'), body:GR('#ffffff', '#b9c6e6', '#4a5a8a'), hand:GR('#ffe2b8', '#d98952') }) },
+  graffiti:  { bg:'#7a3b2e', bgFx:'brick', ink:'#111', w:8, jitter:1, passes:1, shadow:'rgba(0,0,0,.3)',
+               fills:PAL({ main:GR('#ffe14d', '#ff4d6d', '#7b2ff7'), light:GR('#ffffff', '#9ff0ff'), shade:'#2c1a7a', accent:'#21e68a', body:GR('#7ef9ff', '#3d7bff'), hand:GR('#ffe14d', '#ff4d6d') }),
+               layers:[ { ink:'#ffffff', w:24, fills:allFills('#ffffff'), shapeShadow:'rgba(0,0,0,.45)' }, {} ] },
+  metalalbum:{ bg:'#120b08', bgFx:'storm', ink:'#000', w:4, jitter:.6, passes:1, grain:.2, post:['vignette'], shadow:'rgba(0,0,0,.5)',
+               fills:PAL({ main:GR('#f2c14e', '#b3461b', '#3a0f05'), light:GR('#e8e2d0', '#6b6052'), shade:'#1c0d07', accent:'#c21f1f', body:GR('#c9c4b8', '#4a443c'), hand:GR('#f2c14e', '#b3461b') }) },
+  surfwear:  { bg:'#00c2c7', bgFx:'sun', ink:'#111', w:6, jitter:.3, passes:1, shadow:'rgba(0,0,0,.25)',
+               fills:PAL({ main:'#ff3c8e', light:'#fff36b', shade:'#3b2bd1', accent:'#ff9e1b', body:'#fff36b', hand:'#ff9e1b' }) },
+  bmx:       { bg:'#e6e6e6', ink:'#000', w:6, jitter:0, passes:1, shadow:'rgba(0,0,0,.25)',
+               fills:PAL({ main:'#00a0ff', light:'#ffffff', shade:'#111', accent:'#ff1e56', body:'#ffffff', hand:'#ff1e56' }),
+               layers:[ { ink:'#000', w:40, fills:allFills('#000'), shapeShadow:'rgba(0,0,0,.3)' }, { ink:'#fff', w:20, fills:allFills('#fff'), shadow:null }, { shadow:null } ] },
+  splatter91:{ bg:'#ffffff', bgFx:'splatter', ink:'#111', w:5, jitter:.4, passes:1, shadow:'rgba(0,0,0,.15)',
+               fills:PAL({ main:'#ff2bd6', light:'#00f0ff', shade:'#7d00ff', accent:'#e6ff00', body:'#00f0ff', hand:'#e6ff00' }) },
+  // CARTOON
+  cel:       { bg:'#bfe3ff', bgFx:'sky', ink:'#1a1a1a', w:4, jitter:0, passes:1, shadow:'rgba(0,0,40,.2)',
+               fills:PAL({ main:{ grad:['#f08a3c', '#f08a3c', '#c0612a', '#c0612a'], angle:130 }, light:{ grad:['#ffffff', '#ffffff', '#c9d6e8', '#c9d6e8'], angle:130 }, shade:'#b9c7d9', accent:'#ff8fab',
+                          body:{ grad:['#ffffff', '#ffffff', '#c9d6e8', '#c9d6e8'], angle:130 }, hand:'#ffd36b' }) },
+  boil:      { bg:'#f7f3e8', ink:'#1a1a1a', w:3.5, jitter:4.5, passes:1, shadow:'rgba(0,0,0,.12)',
+               fills:PAL({ main:'#f2994a', light:'#ffffff', shade:'#d6c8b0', accent:'#f27a9b', body:'#ffffff', hand:'#ffe08a' }) },
+  rubberhose:{ bg:'#e8dcc0', ink:'#111', w:5, jitter:.6, passes:1, jiggle:true, grain:.35, post:[['gradmap', { stops:['#1a1410', '#efe3c8'] }], 'film'], shadow:'rgba(0,0,0,.25)',
+               fills:PAL({ main:'#111', light:'#f4ecd8', shade:'#111', accent:'#f4ecd8', body:'#f4ecd8', hand:'#f4ecd8' }) },
+  flash:     { bg:'#9fe0ff', ink:'#22313f', w:2.2, jitter:0, passes:1, shadow:'rgba(0,0,0,.15)',
+               fills:PAL({ main:GR('#ffb066', '#ff7a1a'), light:GR('#ffffff', '#e3eef8'), shade:GR('#9fb3c8', '#6f86a0'), accent:GR('#ffa3c4', '#ff6f9c'), body:GR('#ffffff', '#e3eef8'), hand:GR('#ffe08a', '#ffc23d') }) },
+  chibi:     { bg:'#ffe9f3', ink:'#5a3b4a', w:4, jitter:.3, passes:1, shadow:'rgba(150,80,120,.15)',
+               fills:PAL({ main:'#ffb38a', light:'#fffafc', shade:'#d9c2f0', accent:'#ff9cc5', body:'#fffafc', hand:'#ffe3a6', iris:'#5a3b4a' }),
+               layers:[ { ink:'#ffffff', w:26, fills:allFills('#ffffff'), shapeShadow:'rgba(150,80,120,.35)' }, {} ] },
+  desert:    { bg:'#ffb067', bgFx:'dunes', ink:'#4a2b16', w:3.5, jitter:.5, passes:1, post:[['wobble', { amp:2 }]], shadow:'rgba(120,60,20,.25)',
+               fills:PAL({ main:'#e08a3c', light:'#fff1d6', shade:'#b8612e', accent:'#e86a5a', body:'#fff1d6', hand:'#f2c14e' }) },
+  candyland: { bg:'#ffe3f1', bgFx:'candy', ink:'#b0306a', w:4, jitter:.3, passes:1, shadow:'rgba(176,48,106,.15)',
+               fills:PAL({ main:{ stripes:['#ff8fc7', '#ffffff'], gap:14 }, light:'#fff6fb', shade:'#8fe3ff', accent:'#b6ff8f', body:{ stripes:['#9ff2d4', '#ffffff'], gap:14 }, hand:{ stripes:['#fff07a', '#ffffff'], gap:10 }, dark:'#7a1f4a' }) },
+  gothic:    { bg:'#1d1427', bgFx:'moon', ink:'#0a0610', w:4.5, jitter:2.6, passes:1, shadow:'rgba(0,0,0,.4)',
+               fills:PAL({ main:'#6a3fa0', light:'#d8cfe8', shade:'#2a1840', accent:'#c21f5b', body:'#d8cfe8', hand:'#4a2f6a', eye:'#ffffff' }) },
+  shonen:    { bg:'#fff7e0', bgFx:'aura', ink:'#111', w:5.5, jitter:.3, passes:1, jiggle:true, post:[['bloom', { a:.3 }]], shadow:'rgba(255,150,0,.25)',
+               fills:PAL({ main:'#ffcf1a', light:'#ffffff', shade:'#e08a00', accent:'#ff4d2e', body:'#ffe680', hand:'#ff4d2e' }) },
+  cel90:     { bg:'#7ec8ff', bgFx:'sky', ink:'#2a1b3a', w:3, jitter:.2, passes:1, shadow:'rgba(0,0,60,.2)',
+               fills:PAL({ main:{ grad:['#ffb27a', '#ffb27a', '#d9733a', '#d9733a'], angle:130 }, light:{ grad:['#ffffff', '#ffffff', '#d6d0ee', '#d6d0ee'], angle:130 }, shade:'#8a7fc0',
+                          accent:'#ff7aa8', body:{ grad:['#ffffff', '#ffffff', '#d6d0ee', '#d6d0ee'], angle:130 }, hand:'#ffd36b', iris:'#3a1f6b' }) },
+  cineanime: { bg:'#22305c', bgFx:'dusk', ink:'#2a2030', w:2.2, jitter:0, passes:1, post:[['bloom', { a:.4 }], 'vignette'], shadow:'rgba(0,0,0,.3)',
+               fills:PAL({ main:GR('#ffd2a1', '#e0874f', '#8a4a3a'), light:GR('#fff6ea', '#e6c8c0'), shade:'#6a5470', accent:'#ff9aa8', body:GR('#fff6ea', '#e6c8c0'), hand:GR('#ffe0b0', '#e0a070'), iris:'#4a2a20' }) },
+  // PIXELS
+  pixelart:  { bg:'#5cc8ff', ink:'#1a1a2e', w:5, jitter:0, passes:1, pixel:12, shadow:'rgba(0,0,0,.25)',
+               fills:PAL({ main:'#ff8a2a', light:'#ffffff', shade:'#ff4d4d', accent:'#ff6fae', body:'#ff4d6d', hand:'#ffd23a' }) },
+  console32: { bg:'#1a1030', bgFx:'stage', ink:'#120a20', w:3, jitter:0, passes:1, pixel:5, shadow:'rgba(0,0,0,.35)',
+               fills:PAL({ main:GR('#ffc07a', '#e06a2a', '#7a2a10'), light:GR('#ffffff', '#b8c0e0'), shade:'#4a3a8a', accent:'#ff5f9e', body:GR('#e8f0ff', '#8090c0'), hand:GR('#ffe07a', '#e09a2a') }) },
+  terminal:  { bg:'#d8d8d8', ink:'#111', w:6, jitter:0, passes:1, post:[['ascii', { color:'#39ff6a' }], ['bloom', { a:.35 }], 'scanlines'], shadow:'rgba(0,0,0,.4)',
+               fills:PAL({ main:'#7a7a7a', light:'#f0f0f0', shade:'#444', accent:'#a0a0a0', body:'#e0e0e0', hand:'#bbbbbb' }) },
+  colourclash:{ bg:'#2222aa', ink:'#000', w:5, jitter:0, passes:1, post:['colourclash'], shadow:'rgba(0,0,0,.4)',
+               fills:PAL({ main:'#ffdd22', light:'#ffffff', shade:'#ff2222', accent:'#ff22ff', body:'#22ffff', hand:'#22ff22' }) },
+  teletext:  { bg:'#0000ff', ink:'#ffffff', w:7, jitter:0, passes:1, post:['teletext'], shadow:null,
+               fills:PAL({ main:'#ffff00', light:'#ffffff', shade:'#ff0000', accent:'#ff00ff', body:'#00ff00', hand:'#00ffff', dark:'#000', iris:'#000' }) },
+  sprite16:  { bg:'#6fb7ff', bgFx:'sky', ink:'#1a0f2e', w:6, jitter:0, passes:1, pixel:7, shadow:'rgba(0,0,0,.3)',
+               fills:PAL({ main:{ grad:['#ffb04a', '#ffb04a', '#e0702a', '#e0702a'], angle:120 }, light:'#ffffff', shade:'#7a5cff', accent:'#ff5c8a', body:{ grad:['#ff5c8a', '#ff5c8a', '#c22a5a', '#c22a5a'], angle:120 }, hand:'#ffe05c' }) },
+  arcade:    { bg:'#ff7a3a', bgFx:'stage', ink:'#120a08', w:5, jitter:0, passes:1, pixel:8, post:['scanlines'], shadow:'rgba(0,0,0,.4)',
+               fills:PAL({ main:GR('#ffb84a', '#d0501a'), light:GR('#ffffff', '#c8d0e8'), shade:'#2a3a8a', accent:'#ff2a5a', body:GR('#4ad0ff', '#1a5ab0'), hand:GR('#ffe04a', '#e0901a') }) },
+  // SCREENS AND LIGHT
+  oscilloscope:{ bg:'#020a04', bgFx:'graticule', ink:'#5cff8a', w:2, glow:16, jitter:.3, passes:1, post:[['trails', { decay:.6, mode:'lighten' }], 'bloom'],
+               fills:{ dark:'#5cff8a', eyeWhite:'#020a04', iris:'#5cff8a' } },
+  thermal:   { bg:'#202020', ink:'#555', w:3, jitter:.2, passes:1, post:[['gradmap', { stops:['#000010', '#3b0f70', '#8c2981', '#de4968', '#fe9f6d', '#fcfdbf'], contrast:1.25, scale:.3 }]], shadow:'rgba(255,255,255,.1)',
+               fills:PAL({ main:'#d8d8d8', light:'#ffffff', shade:'#9a9a9a', accent:'#ffffff', body:'#cfcfcf', hand:'#f0f0f0', dark:'#666', eye:'#8a8a8a' }) },
+  xray:      { bg:'#000000', ink:'#bfe6ff', w:2.4, glow:10, jitter:.2, passes:1, post:['bloom', ['gradmap', { stops:['#000814', '#0f3460', '#7fc8ff', '#ffffff'] }]], shadow:null,
+               fills:PAL({ main:'rgba(160,210,255,.25)', light:'rgba(200,230,255,.35)', shade:'rgba(120,170,230,.2)', accent:'rgba(220,240,255,.45)', body:'rgba(190,225,255,.3)', hand:'rgba(220,240,255,.45)', dark:'#e8f6ff', eye:'#000', iris:'#e8f6ff' }) },
+  lightpaint:{ bg:'#030308', ink:'HUE', w:3.5, glow:20, jitter:.5, passes:1, jiggle:true, post:[['trails', { decay:.9, mode:'lighten' }], 'bloom'],
+               fills:{ dark:'INK', eyeWhite:'#030308', iris:'INK' } },
+  neon:      { bg:'#1a1214', bgFx:'brick', ink:'#ff3fb4', color2:'#38e8ff', w:3.2, glow:26, jitter:.2, passes:1, post:['bloom', ['flicker', { p:.05 }]], shadow:'rgba(255,63,180,.12)',
+               fills:{ dark:'INK', eyeWhite:'#1a1214', iris:'INK' } },
+  // GLITCH: SIGNAL
+  datamosh:  { bg:'#fbfaf7', ink:'#141414', w:6, jitter:0, passes:1, post:['datamosh'], shadow:'rgba(0,0,0,.16)',
+               fills:PAL({ main:'#f0a24e', light:'#ffffff', shade:'#3ec6c0', accent:'#f48aa0', body:'#7ad0ff', hand:'#ffd23a' }) },
+  tvbreakup: { bg:'#e8e4dc', ink:'#1a1a1a', w:4, jitter:.4, passes:1, post:['tvbreak', 'scanlines'], shadow:'rgba(0,0,0,.2)',
+               fills:PAL({ main:'#e0843a', light:'#ffffff', shade:'#8fa0b5', accent:'#f48aa0', body:'#f0ece4', hand:'#f2c14e' }) },
+  pixelsort: { bg:'#101010', ink:'#f2f2f2', w:3, jitter:.3, passes:1, post:['pixelsort'], shadow:null,
+               fills:PAL({ main:GR('#ffd36b', '#ff4d8d'), light:'#ffffff', shade:'#3a3aff', accent:'#ff4d8d', body:GR('#7ad0ff', '#c04dff'), hand:'#ffd36b', dark:'#101010', eye:'#ffffff' }) },
+  databend:  { bg:'#f4f1ea', ink:'#151515', w:4, jitter:.3, passes:1, post:['databend'], shadow:'rgba(0,0,0,.15)',
+               fills:PAL({ main:'#e88a3a', light:'#ffffff', shade:'#4a8adf', accent:'#ff6fa8', body:'#bfe3ff', hand:'#ffd23a' }) },
+  onebit:    { bg:'#ffffff', ink:'#111', w:4, jitter:.2, passes:1, post:[['threshold', { level:.5, dither:.95, scale:.4 }]], shadow:'rgba(0,0,0,.35)',
+               fills:PAL({ main:'#8a8a8a', light:'#f2f2f2', shade:'#4a4a4a', accent:'#b0b0b0', body:'#d8d8d8', hand:'#a0a0a0' }) },
+  halfdenoised:{ bg:'#e9e4dc', ink:'#1f1f1f', w:3.5, jitter:.6, passes:1, post:['halfdenoise'], shadow:'rgba(0,0,0,.2)',
+               fills:PAL({ main:'#d9853a', light:'#fbf7f0', shade:'#7a8db3', accent:'#e07aa0', body:'#cfd9ea', hand:'#e8c25a' }) },
+  stylemosh: { bg:'#fff3c4', bgDots:'rgba(240,150,40,.22)', ink:'#111', w:6.5, jitter:0, passes:1, mosh:{ with:'acid', block:56, p:.42 }, shadow:'rgba(0,0,0,.18)',
+               fills:PAL({ main:'#f08a2c', light:'#fffdf5', shade:'#e8dfc8', accent:'#ff7fa0', body:'#ffffff', hand:'#ffffff' }) },
+  graphitemosh:{ bg:'#efede6', ink:'rgba(38,38,44,.82)', w:2.3, jitter:2.4, passes:2, mosh:{ with:'onebit', block:40, p:.3 }, post:['datamosh'], shadow:'rgba(0,0,0,.1)',
+               fills:{ dark:'rgba(38,38,44,.85)', eyeWhite:'#efede6', iris:'rgba(38,38,44,.7)', fur:'BG', white:'BG', pink:'rgba(38,38,44,.12)' } },
+  roomglitch:{ bg:'#e9e3d6', bgFx:'room', ink:'#1a1a1a', w:4, jitter:.4, passes:1, post:[['tear', { n:3, amt:120, band:90 }], 'rgb'], shadow:'rgba(0,0,0,.2)',
+               fills:PAL({ main:'#e0843a', light:'#ffffff', shade:'#9aa7b0', accent:'#f48aa0', body:'#f6f2ea', hand:'#f2c14e' }) },
+  printedglitch:{ bg:'#f3eee4', ink:'#ff48b0', w:3, jitter:.8, passes:1, grain:.22, post:[['tear', { n:3, amt:90, band:60, rate:3 }], ['databend', { n:3 }]], shadow:'#ffbfe2',
+               layers:[ { comp:'multiply', fills:{ ...allFills('#ffffff'), fur:'#ffa6d6', pink:'#ff62bb', dark:'#ff48b0', iris:'#ff48b0', body:'#ffd3ea', hand:'#ffc0e2' } },
+                        { comp:'multiply', offset:[9, 5], ink:'#0078bf', shadow:null, fills:{ ...allFills('#ffffff'), fur:{ base:'#ffffff', dots:'#0078bf', size:9 }, dark:'#0078bf', iris:'#0078bf', side:{ base:'#ffffff', dots:'#0078bf', size:9 } } } ] },
+  projection:{ bg:'#151311', ink:'#fff8e8', w:3, jitter:.3, passes:1, post:['projection'], shadow:null,
+               fills:PAL({ main:'#e0a06a', light:'#fff8e8', shade:'#a08a70', accent:'#f0a0b0', body:'#fff8e8', hand:'#f2d07a', dark:'#151311', eye:'#fff8e8', iris:'#151311' }) },
+  // GLITCH: TIME
+  screentear:{ bg:'#fbfaf7', ink:'#141414', w:6, jitter:0, passes:1, post:[['tear', { n:2, amt:200, rate:6 }]], shadow:'rgba(0,0,0,.16)',
+               fills:PAL({ main:'#f0a24e', light:'#ffffff', shade:'#e9e7e1', accent:'#f48aa0', body:'#ffffff', hand:'#ffffff' }) },
+  windowtrails:{ bg:'#3a6ea5', ink:'#111', w:4, jitter:0, passes:1, post:['echo'], shadow:null,
+               fills:PAL({ main:'#f0a24e', light:'#ffffff', shade:'#c0c0c0', accent:'#f48aa0', body:'#ece9d8', hand:'#ffd23a' }) },
+  feedback:  { bg:'#050008', ink:'HUE', w:3.5, glow:10, jitter:.3, passes:1, jiggle:true, post:[['trails', { decay:.9, zoom:1.045, rot:.02, mode:'lighten' }]],
+               fills:PAL({ main:'rgba(0,0,0,.4)', light:'rgba(0,0,0,.4)', shade:'rgba(0,0,0,.4)', accent:'rgba(0,0,0,.4)', body:'rgba(0,0,0,.4)', hand:'rgba(0,0,0,.4)', dark:'INK', eye:'#050008', iris:'INK' }) },
+  melt:      { bg:'#f6f2ea', ink:'#1a1a1a', w:4, jitter:.3, passes:1, post:[['melt', { amt:170 }]], shadow:'rgba(0,0,0,.15)',
+               fills:PAL({ main:'#e0843a', light:'#ffffff', shade:'#7a8db3', accent:'#f48aa0', body:'#bfe3ff', hand:'#f2c14e' }) },
+  extruded:  { bg:'#e9e4f5', ink:'#1a1a2e', w:5, jitter:0, passes:1, post:[['extrude', { block:12, depth:9 }]], shadow:'rgba(0,0,0,.15)',
+               fills:PAL({ main:'#ff8a2a', light:'#ffffff', shade:'#6a5cff', accent:'#ff5fa0', body:'#5cd0ff', hand:'#ffd23a' }) },
+  cubistmosh:{ bg:'#f2efe8', ink:'#151515', w:4, jitter:.3, passes:1, post:['cubist'], shadow:'rgba(0,0,0,.15)',
+               fills:PAL({ main:'#e0843a', light:'#ffffff', shade:'#9aa7b0', accent:'#f48aa0', body:'#f6f2ea', hand:'#f2c14e' }) },
+  pixelmelt: { bg:'#5c6cff', ink:'#1a1030', w:5, jitter:0, passes:1, pixel:9, post:[['melt', { amt:220 }]], shadow:'rgba(0,0,0,.25)',
+               fills:PAL({ main:'#ff9a3a', light:'#ffffff', shade:'#ff3a8a', accent:'#ff6fae', body:'#ff4dd2', hand:'#ffe03a' }) },
+  stuckframes:{ bg:'#151515', ink:'#f2f2f2', w:3, jitter:.6, passes:1, jiggle:true, post:['stuck'], shadow:null,
+               fills:PAL({ main:'#e0843a', light:'#2a2a2a', shade:'#444', accent:'#f48aa0', body:'#3a3a3a', hand:'#f2c14e', dark:'#f2f2f2', eye:'#151515', iris:'#f2f2f2' }) },
+  motionstudy:{ bg:'#f1ede4', ink:'#1a1a1a', w:2.6, jitter:.6, passes:1, jiggle:true, post:['motion'], shadow:'rgba(0,0,0,.1)',
+               fills:PAL({ main:'rgba(224,132,58,.55)', light:'rgba(255,255,255,.6)', shade:'rgba(120,130,150,.5)', accent:'rgba(244,138,160,.6)', body:'rgba(230,226,218,.7)', hand:'rgba(242,193,78,.6)' }) },
+};
+Object.assign(STYLES, NEWSTYLES);
+
+// The Style tab, grouped the way the reference video groups them
+const STYLE_CATS = [
+  ['House', [['Pencil', 'pencil'], ['Line art', 'lineart']]],
+  ['Drawn', [['Chalkboard', 'chalk'], ['Ballpoint', 'ballpoint'], ['Felt-tip', 'felttip'], ['Ink bleed', 'inkbleed'], ['Crayon', 'crayon'], ['Watercolour', 'paint']]],
+  ['Print and paste', [['Riso', 'riso'], ['Assembly', 'assembly'], ['Spray stencil', 'stencil'], ['Photocopy, tenth generation', 'photocopy'], ['Pasted posters', 'posters'], ['Screen-printed gig poster', 'gigposter'],
+    ['Two-tone label, 1979', 'twotone'], ['Industrial minimal', 'industrial'], ['Bleak ink drawing', 'bleakink'], ['Cut paper', 'cutpaper'], ['Sticker', 'sticker']]],
+  ['Comics', [['Print', 'comic'], ['Manga', 'manga'], ['Comic-book CG', 'comiccg'], ['Ink punch', 'pop'], ['1960s newspaper strip', 'newsprint'], ['1960s manga', 'manga60'], ['2000s indie comic', 'indie2000'],
+    ['Spot blacks, 1980s', 'spotblacks'], ['Feathered ink, 1970s', 'feathered'], ['Extreme 1990s', 'extreme90'], ['Technical manga, 1980s', 'techmanga'], ['Oil stick, 1982', 'oilstick'], ['Line screen', 'linescreen'], ['Clean ink', 'ink']]],
+  ['Spooky', [['Bedsheet ghost', 'ghost'], ['Glow in the dark', 'glowdark'], ['Skeleton cartoon, 1929', 'skeleton'], ['Macabre crosshatch', 'macabre'], ['Monster movie poster, 1930s', 'monster'], ['Living shadow', 'shadow'],
+    ['Evil twin', 'eviltwin'], ['Soulfire', 'soulfire'], ['Night vision', 'nightvision'], ['Horror video cover, 1980s', 'horrorvhs'], ['Analog horror', 'analoghorror'], ['Spirit photograph', 'spirit'], ['Blacklight poster', 'blacklight']]],
+  ['1980s and 1990s', [['Airbrushed chrome', 'chrome'], ['Skateboard deck graphic', 'skatedeck'], ['Toy package painting', 'toypack'], ['Vector wireframe', 'wireframe'], ['Video synthesiser', 'videosynth'],
+    ['Computer-generated head', 'cghead'], ['Subway graffiti', 'graffiti'], ['Metal album painting, 1980s', 'metalalbum'], ['Surfwear cartoon, 1980s', 'surfwear'], ['BMX sticker, 1980s', 'bmx'], ['Neon splatter, 1991', 'splatter91']]],
+  ['Cartoon', [['Cel', 'cel'], ['Boil', 'boil'], ['Rubber hose', 'rubberhose'], ['Flash', 'flash'], ['Chibi sticker', 'chibi'], ['Desert', 'desert'], ['Candy land', 'candyland'], ['Gothic angular cartoon', 'gothic'],
+    ['Shonen power-up', 'shonen'], ['1990s cel anime', 'cel90'], ['Cinematic anime', 'cineanime']]],
+  ['Pixels', [['Pixel', 'pixelart'], ['Handheld LCD', 'pixel'], ['32-bit console', 'console32'], ['Terminal', 'terminal'], ['Colour clash', 'colourclash'], ['Teletext page', 'teletext'], ['16-bit sprite', 'sprite16'], ['Arcade fighter', 'arcade']]],
+  ['Screens and light', [['Oscilloscope', 'oscilloscope'], ['Thermal camera', 'thermal'], ['X-ray', 'xray'], ['Hologram', 'hologram', '#39f3ff'], ['Light painting', 'lightpaint'], ['Neon', 'neon']]],
+  ['Glitch: signal', [['Datamosh', 'datamosh'], ['VHS tape', 'vhs'], ['TV breakup', 'tvbreakup'], ['Channel shift', 'rgb'], ['Pixel sort', 'pixelsort'], ['Databend', 'databend'], ['1-bit dither', 'onebit'],
+    ['Half-denoised', 'halfdenoised'], ['Style mosh', 'stylemosh'], ['Graphite mosh', 'graphitemosh'], ['Room glitch', 'roomglitch'], ['Printed glitch', 'printedglitch'], ['Projection', 'projection']]],
+  ['Glitch: time', [['Screen tear', 'screentear'], ['Window trails', 'windowtrails'], ['Video feedback', 'feedback'], ['Interpolation melt', 'melt'], ['Extruded pixels', 'extruded'], ['Cubist mosh', 'cubistmosh'],
+    ['Pixel melt', 'pixelmelt'], ['Pixel wind', 'pixelwind'], ['A thousand stuck frames', 'stuckframes'], ['Motion study', 'motionstudy']]],
+  ['Hologram', [['Cyan beam', 'hologram', '#39f3ff'], ['Green beam', 'hologram', '#59ff8a'], ['Amber beam', 'hologram', '#ffb53a'], ['Red laser', 'hologram', '#ff3344'], ['Deep blue', 'hologram', '#3a6bff'],
+    ['Ghost white', 'hologram', '#e8eef7'], ['Security foil: green and pink', 'hologram', '#59ff8a', '#ff4fd8'], ['Foil: rose and gold', 'hologram', '#ff7aa8', '#ffd23a']]],
+  ['Originals', [['Blueprint', 'blueprint'], ['Pop burst', 'pop'], ['Holo foil', 'foil'], ['Acid trip', 'acid'], ['Colour static', 'static']]],
+];
+
 const DEFAULT_SCORE = `[
   // bar 1 — the engine reads this like sheet music
   { at: [1, 1], character: 'hashbrown', style: 'lineart', pose: 'happy' },
@@ -253,6 +580,16 @@ const DEFAULT_SCORE = `[
   { at: [10, 1], character: 'fridge', pose: 'waving' },
   { at: [10, 3], character: 'hashbrown' },
   { at: [11, 1], character: 'fridge' },
+  // bar 12: the reference video's tricks: cast, camera moves, style grids
+  { at: [12, 1], who: 'boss', style: 'manga', pose: 'selling' },
+  { at: [12, 3], who: 'child', camera: 'close', pose: 'feel-excited' },
+  { at: [13, 1], who: 'oldman', camera: 'medium', style: 'neon', pose: 'dunno' },
+  { at: [13, 3], camera: 'handheld', style: 'horrorvhs', pose: 'feel-terrified' },
+  { at: [14, 1], who: 'hashbrown', camera: 'full', style: 'riso', pose: 'feel-happy', grid: 3 },
+  { at: [14, 3], grid: 5 },
+  { at: [15, 1], grid: 1, style: 'pixelsort', pose: 'feel-laughing' },
+  { at: [15, 3], pose: 'eyes-suspicious' },
+  { at: [16, 1], style: 'chrome', pose: 'deal' },
 ]`;
 
 /* ---------- geometry helpers (everything becomes polylines) ---------- */
@@ -268,7 +605,7 @@ function quad(p0, c, p1, n = 18) { const p = []; for (let i = 0; i <= n; i++) { 
 
 /* ---------- the "pen": one drawing API, many styles ---------- */
 function makePen(ctx, S, seed, t) {
-  const ink = S.color || S.ink;
+  const ink = S.color || (S.ink === 'HUE' ? `hsl(${(t * 90) % 360}, 100%, 62%)` : S.ink), ink2 = S.color2; let nStroke = 0;
   function path(pts, closed, pass) {
     ctx.beginPath();
     pts.forEach(([x, y], i) => {
@@ -282,8 +619,9 @@ function makePen(ctx, S, seed, t) {
   return {
     stroke(pts, closed = true, k = 1, color) {
       ctx.save();
-      ctx.strokeStyle = color || ink; ctx.lineWidth = S.w * k; ctx.lineJoin = ctx.lineCap = 'round';
-      if (S.glow) { ctx.shadowColor = ink; ctx.shadowBlur = S.glow; }
+      const sc = color || (ink2 && (nStroke++ % 2) ? ink2 : ink);
+      ctx.strokeStyle = sc; ctx.lineWidth = S.w * k; ctx.lineJoin = ctx.lineCap = 'round';
+      if (S.glow) { ctx.shadowColor = sc; ctx.shadowBlur = S.glow; }
       for (let p = 0; p < S.passes; p++) { path(pts, closed, p); ctx.stroke(); }
       ctx.restore();
     },
@@ -324,6 +662,28 @@ function makePen(ctx, S, seed, t) {
         if (c.noise) {                    // TV-static colour noise, re-rolled on the boil
           const pat = ctx.createPattern(noiseTile(c.noise, seed % 4), 'repeat');
           pat.setTransform(new DOMMatrix().scale(3.2 / Math.hypot(m.a, m.b) * (ctx.canvas.width / 1920))); ctx.fillStyle = pat; ctx.fillRect(x0 - 10, y0 - 10, x1 - x0 + 20, y1 - y0 + 20);
+        }
+        if (c.grad) {                     // linear gradient across the shape (airbrush, chrome, CG shading)
+          const a = (c.angle ?? 90) * Math.PI / 180, gx = (x0 + x1) / 2, gy = (y0 + y1) / 2, r = Math.max(x1 - x0, y1 - y0) / 2, n = c.grad.length;
+          const g = ctx.createLinearGradient(gx - Math.cos(a) * r, gy - Math.sin(a) * r, gx + Math.cos(a) * r, gy + Math.sin(a) * r);
+          const hard = n === 4 && c.grad[0] === c.grad[1] && c.grad[2] === c.grad[3];
+          c.grad.forEach((col, i) => g.addColorStop(hard ? [0, .5, .5, 1][i] : n > 1 ? i / (n - 1) : 0, col)); ctx.fillStyle = g; ctx.fillRect(x0 - 2, y0 - 2, x1 - x0 + 4, y1 - y0 + 4);
+        }
+        if (c.hatch) {                    // hatching / crosshatching with a slightly unsteady hand
+          ctx.strokeStyle = c.hatch; ctx.lineWidth = (c.lw || 1.5) / px; const gap = (c.gap || 7) / px, angs = [c.angle ?? 40]; if (c.cross) angs.push(angs[0] + 90);
+          const gx = (x0 + x1) / 2, gy = (y0 + y1) / 2, R = Math.hypot(x1 - x0, y1 - y0) / 2 + gap;
+          for (const A of angs) { const a = A * Math.PI / 180, ux = Math.cos(a), uy = Math.sin(a); ctx.beginPath();
+            for (let q = -R, i = 0; q <= R; q += gap, i++) { const j = (rnd(i, seed) - .5) * gap * .35, ox = gx - uy * (q + j), oy = gy + ux * (q + j); ctx.moveTo(ox - ux * R, oy - uy * R); ctx.lineTo(ox + ux * R, oy + uy * R); }
+            ctx.stroke(); }
+        }
+        if (c.stripes) {                  // candy stripes
+          const band = (c.gap || 14) / px, hh = y1 - y0; ctx.lineWidth = band * 1.02;
+          for (let q = x0 - hh, i = 0; q < x1 + band; q += band, i++) { ctx.strokeStyle = c.stripes[i % c.stripes.length]; ctx.beginPath(); ctx.moveTo(q, y1); ctx.lineTo(q + hh, y0); ctx.stroke(); }
+        }
+        if (c.spray) {                    // spray paint: solid core, speckled edge
+          ctx.fillStyle = c.spray; ctx.globalAlpha = .9; ctx.fill(); ctx.globalAlpha = 1;
+          for (let i = 0; i < 140; i++) { const q = pts[Math.floor(rnd(i, 5) * pts.length)], r = (1 + rnd(i, 6) * 3.5) / px, d = (rnd(i, 7) * 12) / px, a = rnd(i, 8) * TAU;
+            ctx.fillStyle = rnd(i, 9) < .5 ? S.bg : c.spray; ctx.beginPath(); ctx.arc(q[0] + Math.cos(a) * d, q[1] + Math.sin(a) * d, r, 0, TAU); ctx.fill(); }
         }
         if (c.scribble) {                 // crayon / chalk: jittery diagonal strokes that re-scribble on the boil
           ctx.strokeStyle = c.scribble; ctx.lineWidth = (c.lw || 3.2) / px; ctx.lineCap = 'round';
@@ -375,7 +735,7 @@ const _pix = document.createElement('canvas'), _layer = document.createElement('
 // Shared parts: any character can reuse these, so every pose works on every character.
 function drawEyes(ctx, pen, P, cx, ey, browOffset, pupil = .42, iris = false) {
   for (const side of [-1, 1]) {
-    const ex = cx + side * P.eyeGap, rx = P.eyeSize, ry = Math.max(1, P.eyeSize * .62 * P.eyeOpen);
+    const es = P.eyeSize * (P.eyeScale || 1), ex = cx + side * P.eyeGap, rx = es, ry = Math.max(1, es * .62 * P.eyeOpen);
     if (P.eyeOpen < .16) { pen.stroke(quad([ex - rx, ey], [ex, ey + 6], [ex + rx, ey]), false, 1.3); }
     else {
       const eye = ellipse(ex, ey, rx, ry, 32);
@@ -399,7 +759,7 @@ const squashAt = (ctx, footY, sq) => { ctx.translate(0, footY); ctx.scale(1 / Ma
 
 const CHARACTERS = {
   fridge(ctx, pen, P, S, t, sq) {
-    ctx.save(); squashAt(ctx, 135, sq);
+    ctx.save(); squashAt(ctx, 135, sq); ctx.translate(0, 135); ctx.scale(P.bw, P.bh); ctx.translate(0, -135);
     const back = rrect(-83, -147, 210, 262, 32), front = rrect(-108, -125, 210, 262, 32);
     pen.fill(back, 'side'); pen.stroke(back, true, .8);
     pen.fill(front, 'body');
@@ -416,15 +776,24 @@ const CHARACTERS = {
       const shape = up.concat(lo.slice().reverse()); pen.fill(shape, 'dark'); pen.stroke(shape, true, 1.1);
     } else pen.stroke(up, false, 1.3);
     ctx.restore();
-    // hands (not squashed with the body)
-    const hand = (x, y, r, flip, wave) => {
+    // hands (not squashed with the body). shapes: 0 mitten, 1 fist, 2 point, 3 five, 4 thumbs up, 5 two, 6 three, 7 palm up
+    const hand = (x, y, r, flip, wave, shape) => {
       ctx.save(); ctx.translate(x, y); ctx.rotate((r + wave * Math.sin(t * 13) * 22) * Math.PI / 180); ctx.scale(flip, 1);
-      const palm = rrect(-22, -30, 44, 58, 18), thumb = ellipse(-24, 2, 10, 15, 18);
-      pen.fill(thumb, 'hand'); pen.stroke(thumb, true, .9); pen.fill(palm, 'hand'); pen.stroke(palm, true, .9);
-      pen.stroke([[-8, -28], [-8, -8]], false, .6); pen.stroke([[6, -28], [6, -8]], false, .6);
+      const sh = Math.round(shape || 0), finger = (fx, len, ang = 0) => { ctx.save(); ctx.translate(fx, -14); ctx.rotate(ang * Math.PI / 180); const f = rrect(-6, -len, 12, len + 8, 6); pen.fill(f, 'hand'); pen.stroke(f, true, .85); ctx.restore(); };
+      if (sh === 0 || sh === 7) {
+        const palm = rrect(-22, -30, 44, 58, 18), thumb = ellipse(-24, 2, 10, 15, 18);
+        pen.fill(thumb, 'hand'); pen.stroke(thumb, true, .9); pen.fill(palm, 'hand'); pen.stroke(palm, true, .9);
+        pen.stroke([[-8, -28], [-8, -8]], false, .6); pen.stroke([[6, -28], [6, -8]], false, .6);
+      } else {
+        ({ 2: [[-3, 36]], 3: [[-16, 26, -14], [-6, 32, -5], [5, 32, 5], [15, 27, 14]], 5: [[-7, 32, -8], [6, 32, 8]], 6: [[-12, 29, -10], [0, 33, 0], [12, 29, 10]] }[sh] || []).forEach(([fx, len, a]) => finger(fx, len, a || 0));
+        if (sh === 4) finger(-12, 30, -6);
+        const palm = rrect(-20, -20, 40, 42, 15); pen.fill(palm, 'hand'); pen.stroke(palm, true, .9);
+        if (sh !== 3) for (const kx of [-9, 0, 9]) pen.stroke([[kx, -18], [kx, -9]], false, .5);
+        if (sh !== 4) { const th = ellipse(-22, 4, 9, 13, 16); pen.fill(th, 'hand'); pen.stroke(th, true, .85); }
+      }
       ctx.restore();
     };
-    hand(P.lhX, P.lhY, P.lhR, 1, 0); hand(P.rhX, P.rhY, P.rhR, -1, P.wave);
+    hand(P.lhX * P.bw, 135 + (P.lhY - 135) * P.bh, P.lhR, 1, 0, P.handL); hand(P.rhX * P.bw, 135 + (P.rhY - 135) * P.bh, P.rhR, -1, P.wave, P.handR);
   },
 };
 
@@ -487,7 +856,7 @@ function makeSvgCharacter(rig) {
       if (id === 'leg-front-left') about(ctx, pv, () => ctx.rotate(legUp(P.lhY, P.lhR) * Math.PI / 180));
       if (id === 'leg-front-right') about(ctx, pv, () => ctx.rotate(-(legUp(P.rhY, -P.rhR) + P.wave * Math.sin(t * 13) * 16) * Math.PI / 180));
       if (id.startsWith('eyes-')) { ctx.translate(P.lookX * .9, P.lookY * .9);
-        about(ctx, pv, () => ctx.scale(P.eyeSize / 20, id === 'eyes-open' ? clamp(P.eyeOpen, .3, 1) : 1)); }
+        about(ctx, pv, () => ctx.scale(P.eyeSize * (P.eyeScale || 1) / 20, id === 'eyes-open' ? clamp(P.eyeOpen, .3, 1) : 1)); }
       if (id.startsWith('brows-')) ctx.translate(P.lookX * .4, (P.browY + 78) * 1.1);
       if (id.startsWith('mouth-')) about(ctx, pv && [pv[0], pv[1] - 22], () => ctx.scale(clamp(P.mouthW / 30, .6, 1.4), open ? clamp(.45 + P.mouthOpen / 18, .5, 1.25) : 1));
       for (const p of part.paths) { if (p.role) pen.fill(p.pts, p.role); pen.stroke(p.pts, p.closed, (p.role ? 1 : .7) / s * .62); }
@@ -628,56 +997,80 @@ path { stroke: #161514; stroke-width: 6; stroke-linecap: round; stroke-linejoin:
 </g>
 </svg>`;
 CHARACTERS.hashbrown = makeSvgCharacter(parseSvgRig(HASHBROWN_SVG));
+for (const [id, c] of Object.entries(CAST)) if (id !== 'doug')
+  CHARACTERS[id] = (ctx, pen, P, S, t, sq) => CHARACTERS.fridge(ctx, pen, { ...P, bw: P.bw * c.bw, bh: P.bh * c.bh, eyeScale: (P.eyeScale || 1) * (c.eyeScale || 1), browW: P.browW * (c.browW || 1) }, S, t, sq);
 
 function drawCharacter(ctx, P, S, t, who = 'fridge') {
   const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920;
   const seed = Math.floor(t * 12);               // "boil": redraw jitter 12×/sec like hand animation
-  const posts = [].concat(S.post || []);
+  const posts = [].concat(S.post || []).map(q => Array.isArray(q) ? [q[0], q[1] || {}] : [q, {}]);
   ctx.fillStyle = S.bg; ctx.fillRect(0, 0, W, H);
   if (S.bgDots) { const pat = ctx.createPattern(dotTile(S.bgDots, S.bgDotSize || 16, W), 'repeat'); pat.setTransform(new DOMMatrix().rotate(20)); ctx.fillStyle = pat; ctx.fillRect(0, 0, W, H); }
   if (S.bgFx) backgroundFx(ctx, S.bgFx, t, P);
 
-  // the figure normally lands straight on the frame; pixel wind needs it on its own sheet first
-  const main = ctx, figMode = posts.includes('pixelwind');
+  // the figure normally lands straight on the frame; figure effects (pixel wind, extrude…) need it on its own sheet
+  const figFx = posts.find(([n]) => FIG_FX.has(n)), main = ctx, figMode = !!figFx;
   if (figMode) { _fig.width = W; _fig.height = H; }
   const base = figMode ? _fig.getContext('2d') : main;
   // a style can be several printed passes: misregistered riso inks, a sticker's white backing, etc.
   const layers = S.layers ? S.layers.map(l => ({ ...S, ...l, layers: null })) : [S];
+  const shx = P.shake ? (Math.sin(t * 1.7) * 9 + Math.sin(t * 4.3) * 4) * P.shake * k : 0, shy = P.shake ? (Math.cos(t * 1.3) * 7 + Math.sin(t * 3.7) * 3) * P.shake * k : 0;
   layers.forEach((L, li) => {
     if (L.comp) { _layer.width = W; _layer.height = H; ctx = _layer.getContext('2d'); } else ctx = base;
     const pen = makePen(ctx, L, seed + li * 5, t);
     ctx.save();
     if (L.offset) ctx.translate(L.offset[0] * k, L.offset[1] * k);
-    ctx.translate(W / 2 + P.camX, H / 2 - 20); ctx.scale(P.zoom * 1.9 * H / 1080, P.zoom * 1.9 * H / 1080);
+    ctx.translate(W / 2 + P.camX + shx, H / 2 - 20 + shy); ctx.scale(P.zoom * 1.9 * H / 1080, P.zoom * 1.9 * H / 1080);
+    if (P.shake) ctx.rotate(Math.sin(t * 1.1) * .012 * P.shake);
+    ctx.translate(0, P.camY || 0);
     if (li === 0) {   // ground shadow / hologram pad
       if (L.holo) { for (let i = 0; i < 3; i++) pen.stroke(ellipse(0, 215 + i * 6, 120 - i * 25, 22 - i * 4), true, .7); }
       else if (L.shadow) { ctx.fillStyle = L.shadow; ctx.beginPath(); ctx.ellipse(0, 205, 150 * (2 - P.squash) * .9, 16, 0, 0, TAU); ctx.fill(); }
     }
     const breathe = Math.sin(t * 2.2), bounce = -Math.abs(Math.sin(t * 9)) * P.bounce;
-    ctx.translate(P.bx, P.by + breathe * 3 + bounce + (L.holo ? Math.sin(t * 1.6) * 8 - 15 : 0));
+    ctx.translate(P.bx, P.by + breathe * 3 + bounce + (L.holo || L.float ? Math.sin(t * 1.6) * 8 - 15 : 0));
     ctx.rotate(P.tilt * Math.PI / 180);
-    CHARACTERS[who](ctx, pen, P, L, t, P.squash + breathe * .012);
+    CHARACTERS[who](ctx, pen, P, L, t, P.squash + breathe * .012 + (L.jiggle ? Math.sin(t * 8.5) * .045 : 0));
     ctx.restore();
     if (L.comp) { base.save(); base.globalCompositeOperation = L.comp; base.drawImage(_layer, 0, 0); base.restore(); }
   });
   ctx = main;
-  if (figMode) pixelWind(ctx, _fig, t, S);
+  if (figMode) { if (figFx[0] === 'pixelwind') pixelWind(ctx, _fig, t, S); else FX[figFx[0]](ctx, t, figFx[1], S, _fig); }
 
+  // style mosh: blocks of the frame swapped with the same moment drawn in another style
+  if (S.mosh && !S._inMosh) {
+    const alt = fxCanvas('mosh'); alt.width = W; alt.height = H; drawCharacter(alt.getContext('2d'), P, { ...STYLES[S.mosh.with], color: null, _inMosh: true }, t, who);
+    const bl = (S.mosh.block || 48) * k, s2 = Math.floor(t * 5);
+    for (let y = 0; y < H; y += bl) for (let x = 0; x < W; x += bl) if (rnd(Math.floor(x / bl) * 13 + Math.floor(y / bl) * 7, s2) < (S.mosh.p || .4)) ctx.drawImage(alt, x, y, bl, bl, x, y, bl, bl);
+  }
   // post effects on the whole frame
   if (S.pixel) {
     const bw = Math.max(8, Math.round(W / (S.pixel * k))), bh = Math.max(5, Math.round(H / (S.pixel * k)));
     _pix.width = bw; _pix.height = bh; _pix.getContext('2d').drawImage(ctx.canvas, 0, 0, bw, bh);
     ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(_pix, 0, 0, bw, bh, 0, 0, W, H); ctx.restore();
   }
-  for (const fx of posts) { if (fx === 'rgb') rgbGlitch(ctx, t); if (fx === 'vhs') vhsTape(ctx, t); if (fx === 'wobble') wobble(ctx, t); if (fx === 'sparkle') sparkle(ctx, t); }
+  for (const [n, o] of posts) if (!FIG_FX.has(n) && FX[n]) FX[n](ctx, t, o, S);
   if (S.grain) { ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = S.grain; ctx.fillStyle = ctx.createPattern(grainTile(), 'repeat'); ctx.fillRect(0, 0, W, H); ctx.restore(); }
   if (S.holo) { ctx.fillStyle = 'rgba(255,255,255,.035)'; for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 1); }
+}
+// a whole scene: one character, or the video's grid of the same moment in many styles
+function drawScene(ctx, P, S, t, who, grid = 1, styleName) {
+  if (!(grid > 1)) return drawCharacter(ctx, P, S, t, who);
+  const W = ctx.canvas.width, H = ctx.canvas.height, cw = W / grid, ch = H / grid, all = STYLE_SWATCHES;
+  let start = Math.max(0, all.findIndex(q => q.style === styleName));
+  ctx.fillStyle = '#111'; ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < grid * grid; i++) {
+    const sw = all[(start + i * 7) % all.length], c = fxCanvas('cell' + i); c.width = Math.max(8, Math.round(cw)); c.height = Math.max(8, Math.round(ch));
+    drawCharacter(c.getContext('2d'), P, { ...STYLES[sw.style], color: sw.color || null, color2: sw.color2 || STYLES[sw.style].color2 }, t + i * .37, who);
+    ctx.drawImage(c, (i % grid) * cw + 1, Math.floor(i / grid) * ch + 1, cw - 2, ch - 2);
+  }
 }
 
 /* ---------- glitch & trip effects ---------- */
 function backgroundFx(ctx, kind, t, P) {
   const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, cx = W / 2 + P.camX * k, cy = H / 2 - 60 * k;
   ctx.save();
+  if (BGX[kind]) BGX[kind](ctx, t, P, W, H, k);
   if (kind === 'rays') {               // pop-art burst: CMY dashes radiating from the character, pulsing
     const cols = ['#00aeef', '#ec008c', '#ffd400'], beat = Math.abs(Math.sin(t * Math.PI * 100 / 60));
     ctx.lineCap = 'round'; ctx.lineWidth = 9 * k;
@@ -742,10 +1135,10 @@ function vhsTape(ctx, t) {                // wobbly tracking, colour bleed, roll
   if (Math.floor(t * 1.2) % 2 === 0) ctx.fillText('PLAY ▶', 70 * k, 100 * k);
   const ss = Math.floor(t) % 60, mm = Math.floor(t / 60); ctx.fillText(`SP  0:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`, 70 * k, H - 70 * k); ctx.restore();
 }
-function wobble(ctx, t) {                 // the whole frame melts in slow sine waves
+function wobble(ctx, t, amp = 16) {                 // the whole frame melts in slow sine waves
   const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, band = Math.max(2, Math.round(5 * k));
   _layer.width = W; _layer.height = H; _layer.getContext('2d').drawImage(ctx.canvas, 0, 0);
-  for (let y = 0; y < H; y += band) ctx.drawImage(_layer, 0, y, W, band, Math.sin(y / k * .012 + t * 3.2) * 16 * k, y, W, band);
+  for (let y = 0; y < H; y += band) ctx.drawImage(_layer, 0, y, W, band, Math.sin(y / k * .012 + t * 3.2) * amp * k, y, W, band);
 }
 function sparkle(ctx, t) {                // foil glints twinkling around the frame
   const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920;
@@ -756,20 +1149,311 @@ function sparkle(ctx, t) {                // foil glints twinkling around the fr
   ctx.restore();
 }
 
+
+/* ---------- frame effects library (post FX, figure FX, backgrounds) ---------- */
+const _fxc = {};
+const fxCanvas = name => _fxc[name] || (_fxc[name] = document.createElement('canvas'));
+function snap(ctx, name = 'snap') { const c = fxCanvas(name); c.width = ctx.canvas.width; c.height = ctx.canvas.height; c.getContext('2d').drawImage(ctx.canvas, 0, 0); return c; }
+function pixelOp(ctx, scale, smooth, fn) {   // read pixels (optionally downscaled), edit, draw back
+  const W = ctx.canvas.width, H = ctx.canvas.height, w = Math.max(2, Math.round(W * Math.min(1, scale))), h = Math.max(2, Math.round(H * Math.min(1, scale)));
+  const c = fxCanvas('px'); c.width = w; c.height = h; const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(ctx.canvas, 0, 0, w, h); const im = g.getImageData(0, 0, w, h); fn(im.data, w, h); g.putImageData(im, 0, 0);
+  ctx.save(); ctx.imageSmoothingEnabled = smooth; ctx.drawImage(c, 0, 0, w, h, 0, 0, W, H); ctx.restore();
+}
+const hexRgb = h => { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); const n = parseInt(h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+const _luts = {};
+function lut(stops) { const k = stops.join(); if (_luts[k]) return _luts[k]; const s = stops.map(hexRgb), L = new Uint8ClampedArray(768);
+  for (let i = 0; i < 256; i++) { const x = i / 255 * (s.length - 1), a = Math.floor(x), b = Math.min(s.length - 1, a + 1), f = x - a; for (let c = 0; c < 3; c++) L[i * 3 + c] = s[a][c] + (s[b][c] - s[a][c]) * f; }
+  return (_luts[k] = L); }
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const lumAt = (d, i) => (d[i] * .3 + d[i + 1] * .59 + d[i + 2] * .11) / 255;
+function nearest(P, r, g, b) { let best = 0, bd = 1e9; for (let j = 0; j < P.length; j++) { const q = P[j], dd = (q[0] - r) ** 2 + (q[1] - g) ** 2 + (q[2] - b) ** 2; if (dd < bd) { bd = dd; best = j; } } return best; }
+// per-canvas memory for effects that need earlier frames (trails, datamosh, stuck frames…)
+const _hist = new WeakMap();
+function hist(ctx, t) {
+  let h = _hist.get(ctx.canvas); if (!h) { h = { prev: document.createElement('canvas'), ring: [], t: -1 }; _hist.set(ctx.canvas, h); }
+  h.live = t > h.t && t - h.t < .25; if (!h.live && t !== h.t) { h.ring.length = 0; h.prevOk = false; } h.t = t; return h;   // reset after a jump/scrub
+}
+function savePrev(ctx, h) { h.prev.width = ctx.canvas.width; h.prev.height = ctx.canvas.height; h.prev.getContext('2d').drawImage(ctx.canvas, 0, 0); h.prevOk = true; }
+function pushRing(ctx, h, n = 40) {
+  const W = ctx.canvas.width, H = ctx.canvas.height, c = h.ring.length >= n ? h.ring.shift() : document.createElement('canvas');
+  c.width = Math.max(1, Math.round(W / 3)); c.height = Math.max(1, Math.round(H / 3)); c.getContext('2d').drawImage(ctx.canvas, 0, 0, c.width, c.height); h.ring.push(c);
+}
+const darkBg = S => { const c = hexRgb((S.bg || '#fff').slice(0, 7)); return c[0] + c[1] + c[2] < 300; };
+
+const FX = {
+  rgb: (ctx, t) => rgbGlitch(ctx, t), vhs: (ctx, t) => vhsTape(ctx, t), sparkle: (ctx, t) => sparkle(ctx, t),
+  wobble: (ctx, t, o) => wobble(ctx, t, o.amp),
+  threshold(ctx, t, o) {
+    const Lc = hexRgb(o.light || '#f2efe6'), Dc = hexRgb(o.dark || '#111111'), lv = o.level ?? .55, sp = o.dither || 0, nz = o.noise || 0, seed = Math.floor(t * 12);
+    pixelOp(ctx, o.scale || .5, false, (d, w, h) => { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4;
+      const v = lumAt(d, i) + (sp ? (BAYER[(x & 3) + (y & 3) * 4] / 16 - .5) * sp : 0) + (nz ? (rnd(x * 7 + y * 13, seed) - .5) * nz : 0); const c = v > lv ? Lc : Dc; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; } });
+  },
+  gradmap(ctx, t, o) {
+    const L = lut(o.stops), ct = o.contrast || 1;
+    pixelOp(ctx, o.scale || .5, true, d => { for (let i = 0; i < d.length; i += 4) { let v = Math.max(0, Math.min(1, (lumAt(d, i) - .5) * ct + .5 + (o.lift || 0))); if (o.invert) v = 1 - v;
+      const j = (v * 255 | 0) * 3; d[i] = L[j]; d[i + 1] = L[j + 1]; d[i + 2] = L[j + 2]; } });
+  },
+  palette(ctx, t, o) {
+    const P = o.colors.map(hexRgb), sp = o.dither || 0, scale = Math.min(1, 1920 / (o.block || 6) / ctx.canvas.width);
+    pixelOp(ctx, scale, false, (d, w, h) => { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = (y * w + x) * 4, q = sp ? (BAYER[(x & 3) + (y & 3) * 4] / 16 - .5) * sp : 0;
+      const c = P[nearest(P, d[i] + q, d[i + 1] + q, d[i + 2] + q)]; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; } });
+    if (o.grid) { const W = ctx.canvas.width, H = ctx.canvas.height, b = W / Math.round(1920 / o.block); ctx.fillStyle = o.grid; for (let x = 0; x < W; x += b) ctx.fillRect(x, 0, Math.max(1, b * .12), H); for (let y = 0; y < H; y += b) ctx.fillRect(0, y, W, Math.max(1, b * .12)); }
+  },
+  posterize(ctx, t, o) { const n = (o.levels || 4) - 1; pixelOp(ctx, o.scale || .5, true, d => { for (let i = 0; i < d.length; i += 4) for (let c = 0; c < 3; c++) d[i + c] = Math.round(d[i + c] / 255 * n) / n * 255; }); },
+  invert(ctx) { ctx.save(); ctx.globalCompositeOperation = 'difference'; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore(); },
+  vignette(ctx, t, o) { const W = ctx.canvas.width, H = ctx.canvas.height, g = ctx.createRadialGradient(W / 2, H / 2, H * .35, W / 2, H / 2, H * .95);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, o.color || 'rgba(0,0,0,.75)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); },
+  bloom(ctx, t, o) { const W = ctx.canvas.width, H = ctx.canvas.height, c = fxCanvas('bloom'); c.width = Math.max(1, W / 14 | 0); c.height = Math.max(1, H / 14 | 0);
+    c.getContext('2d').drawImage(ctx.canvas, 0, 0, c.width, c.height); ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = o.a || .65; ctx.imageSmoothingEnabled = true; ctx.drawImage(c, 0, 0, W, H); ctx.restore(); },
+  soften(ctx, t, o) { const W = ctx.canvas.width, H = ctx.canvas.height, c = fxCanvas('soft'); c.width = Math.max(1, W / 5 | 0); c.height = Math.max(1, H / 5 | 0);
+    c.getContext('2d').drawImage(ctx.canvas, 0, 0, c.width, c.height); ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = o.a || .55; ctx.drawImage(c, 0, 0, W, H); ctx.restore(); },
+  scanlines(ctx, t, o) { const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920; ctx.fillStyle = `rgba(0,0,0,${o.a || .22})`; for (let y = 0; y < H; y += 4 * k) ctx.fillRect(0, y, W, 1.6 * k); },
+  noise(ctx, t, o) { ctx.save(); ctx.globalCompositeOperation = o.mode || 'overlay'; ctx.globalAlpha = o.a || .3; const pat = ctx.createPattern(noiseTile('bw', Math.floor(t * 12) % 4), 'repeat');
+    pat.setTransform(new DOMMatrix().scale(2.5 * ctx.canvas.width / 1920)); ctx.fillStyle = pat; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); ctx.restore(); },
+  flicker(ctx, t, o) { const s = Math.floor(t * 12); if (rnd(s, 77) < (o.p || .12)) { ctx.fillStyle = `rgba(0,0,0,${.25 + rnd(s, 78) * .35})`; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); } },
+  film(ctx, t) {        // old film: flicker, scratches, dust, gate weave
+    const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, s = Math.floor(t * 18);
+    ctx.fillStyle = `rgba(255,250,235,${rnd(s, 1) * .12})`; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(20,15,10,.55)'; ctx.lineWidth = 1.5 * k;
+    for (let i = 0; i < 3; i++) if (rnd(s, i + 5) < .6) { const x = rnd(s, i + 9) * W; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + (rnd(s, i) - .5) * 30 * k, H); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(15,10,5,.7)'; for (let i = 0; i < 14; i++) { ctx.beginPath(); ctx.arc(rnd(s, i + 20) * W, rnd(s, i + 40) * H, (1 + rnd(s, i + 60) * 3) * k, 0, TAU); ctx.fill(); }
+    FX.vignette(ctx, t, { color: 'rgba(20,12,4,.7)' });
+  },
+  copy(ctx, t) {        // tenth-generation photocopy: streaks and burnt edges after a threshold
+    const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, s = Math.floor(t * 6);
+    ctx.fillStyle = 'rgba(0,0,0,.18)'; for (let i = 0; i < 4; i++) ctx.fillRect(rnd(i, s) * W, 0, (2 + rnd(i, s + 1) * 10) * k, H);
+    const g = ctx.createLinearGradient(0, 0, W, 0); g.addColorStop(0, 'rgba(0,0,0,.55)'); g.addColorStop(.08, 'rgba(0,0,0,0)'); g.addColorStop(.92, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.55)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  },
+  wrinkle(ctx) {        // pasted-poster creases
+    const W = ctx.canvas.width, H = ctx.canvas.height;
+    for (let i = 0; i < 7; i++) { const x = rnd(i, 3) * W, y = rnd(i, 4) * H, a = rnd(i, 5) * Math.PI, L = (.3 + rnd(i, 6) * .6) * W, dx = Math.cos(a) * L, dy = Math.sin(a) * L;
+      const g = ctx.createLinearGradient(x - dy * .02, y + dx * .02, x + dy * .02, y - dx * .02); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(.5, 'rgba(0,0,0,.22)'); g.addColorStop(.52, 'rgba(255,255,255,.3)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.strokeStyle = g; ctx.lineWidth = W * .02; ctx.beginPath(); ctx.moveTo(x - dx / 2, y - dy / 2); ctx.lineTo(x + dx / 2, y + dy / 2); ctx.stroke(); }
+  },
+  trails(ctx, t, o) {   // previous frame bleeds through (feedback when it zooms/rotates)
+    const h = hist(ctx, t), W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920;
+    if (h.live && h.prevOk) { ctx.save(); ctx.globalCompositeOperation = o.mode || 'darken'; ctx.globalAlpha = o.decay || .8;
+      if (o.zoom) { ctx.translate(W / 2, H / 2 - 40 * k); ctx.scale(o.zoom, o.zoom); ctx.rotate(o.rot || 0); ctx.translate(-W / 2, -(H / 2 - 40 * k)); }
+      ctx.drawImage(h.prev, (o.dx || 0) * k, (o.dy || 0) * k); ctx.restore(); }
+    savePrev(ctx, h);
+  },
+  tear(ctx, t, o) {     // screen tear: the lower part of the frame slips sideways
+    const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, s = Math.floor(t * (o.rate || 5)), src = snap(ctx);
+    for (let i = 0; i < (o.n || 2); i++) { const y = (.15 + rnd(s, i) * .75) * H, dx = (rnd(s, i + 9) - .5) * (o.amt || 160) * k, hh = (o.band ? o.band * k : H - y);
+      ctx.drawImage(src, 0, y, W, hh, dx, y, W, hh); ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillRect(0, y, W, 1.5 * k); }
+  },
+  pixelsort(ctx, t, o) {   // bright runs in each column are sorted, smearing the figure downward
+    const thr = (o.thr ?? .5) + Math.sin(t * .9) * .12;
+    pixelOp(ctx, .5, false, (d, w, h) => { const col = [];
+      for (let x = 0; x < w; x++) { let y = 0; while (y < h) { while (y < h && lumAt(d, (y * w + x) * 4) < thr) y++; const y0 = y; col.length = 0;
+        while (y < h && lumAt(d, (y * w + x) * 4) >= thr) { const i = (y * w + x) * 4; col.push([d[i], d[i + 1], d[i + 2], lumAt(d, i)]); y++; }
+        if (col.length > 2) { col.sort((a, b) => o.up ? a[3] - b[3] : b[3] - a[3]); for (let j = 0; j < col.length; j++) { const i = ((y0 + j) * w + x) * 4; d[i] = col[j][0]; d[i + 1] = col[j][1]; d[i + 2] = col[j][2]; } } } } });
+  },
+  databend(ctx, t, o) {    // bands of raw bytes slip out of step, scrambling the colour channels
+    const s = Math.floor(t * 8);
+    pixelOp(ctx, .5, false, (d, w, h) => { for (let b = 0; b < (o.n || 7); b++) { const y0 = Math.floor(rnd(s, b) * h), bh = 2 + Math.floor(rnd(s, b + 20) * h * .12), sh = 1 + Math.floor(rnd(s, b + 40) * 7) * 4 + (b % 3);
+      const a = y0 * w * 4, e = Math.min(h, y0 + bh) * w * 4; for (let i = e - 1; i >= a + sh; i--) if ((i & 3) !== 3) d[i] = d[i - sh]; } });
+  },
+  datamosh(ctx, t, o) {    // blocks keep the previous frame's pixels and drift, like a broken codec
+    const h = hist(ctx, t), W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, s = Math.floor(t * 12), burst = rnd(s, 3) > .55, b = (o.block || 40) * k;
+    if (h.live && h.prevOk) for (let y = 0; y < H; y += b) for (let x = 0; x < W; x += b) {
+      if (rnd(x * 31 + y * 7, Math.floor(t * 2)) < (burst ? .5 : .22)) { const mx = Math.sin(y * .01 + t * 2) * 6 * k, my = Math.cos(x * .01 + t * 1.6) * 5 * k; ctx.drawImage(h.prev, x + mx, y + my, b, b, x, y, b, b); } }
+    savePrev(ctx, h);
+  },
+  tvbreak(ctx, t) {        // TV signal breaking up: torn rows, noise bars, test-card flashes
+    const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, s = Math.floor(t * 12), src = snap(ctx), burst = rnd(s, 1) > .6, band = 3 * k;
+    for (let y = 0; y < H; y += band) if (rnd(Math.floor(y / (40 * k)), s) < (burst ? .35 : .08)) ctx.drawImage(src, 0, y, W, band, (rnd(y, s) - .5) * (burst ? 420 : 90) * k, y, W, band);
+    if (burst) { const cols = ['#c0c0c0', '#c0c000', '#00c0c0', '#00c000', '#c000c0', '#c00000', '#0000c0'], y = rnd(s, 5) * H * .8;
+      cols.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(i * W / 7, y, W / 7, 40 * k); }); }
+    FX.noise(ctx, t, { a: burst ? .45 : .2 });
+  },
+  melt(ctx, t, o) {        // pixels slide downward in drips
+    const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, src = snap(ctx), strip = Math.max(2, Math.round(6 * k)), amp = (o.amt || 160) * k;
+    for (let x = 0; x < W; x += strip) { const a = Math.pow(.5 + .5 * Math.sin(x / k * .021 + t * 1.3 + rnd(Math.floor(x / strip), 1) * 4), 4) * amp * (.55 + .45 * Math.sin(t * .8));
+      if (a > 1) ctx.drawImage(src, x, 0, strip, H - a, x, a, strip, H - a); }
+  },
+  cubist(ctx, t, o) {      // the frame re-assembled from shifted, rescaled fragments
+    const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, s = Math.floor(t * (o.rate || 3)), src = snap(ctx);
+    ctx.strokeStyle = 'rgba(20,20,20,.6)'; ctx.lineWidth = 2 * k;
+    for (let i = 0; i < (o.n || 16); i++) { const w = (90 + rnd(s, i) * 330) * k, h = (70 + rnd(s, i + 30) * 300) * k, x = W * .3 + rnd(s, i + 60) * W * .4 - w / 2, y = H * .08 + rnd(s, i + 90) * H * .72 - h / 2;
+      const sc = .8 + rnd(s, i + 120) * .45, sx = x + (rnd(s, i + 150) - .5) * 160 * k, sy = y + (rnd(s, i + 180) - .5) * 120 * k;
+      ctx.drawImage(src, sx, sy, w * sc, h * sc, x, y, w, h); ctx.strokeRect(x, y, w, h); }
+  },
+  stuck(ctx, t) {          // a thousand stuck frames: tiles freeze on moments from the past
+    const h = hist(ctx, t), W = ctx.canvas.width, H = ctx.canvas.height; pushRing(ctx, h, 48); const n = h.ring.length; if (n < 6) return;
+    const cols = 7, rows = 5, tw = W / cols, th = H / rows, s = Math.floor(t * 3);
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { if (rnd(r * cols + c, s) < .45) continue; const f = h.ring[Math.floor(rnd(r * 9 + c, s + 1) * (n - 1))], fx = f.width / cols, fy = f.height / rows;
+      ctx.drawImage(f, c * fx, r * fy, fx, fy, c * tw, r * th, tw, th); }
+  },
+  motion(ctx, t, o, S) {   // motion study: earlier frames overprinted like a chronophotograph
+    const h = hist(ctx, t), W = ctx.canvas.width, H = ctx.canvas.height, cur = snap(ctx, 'cur'); pushRing(ctx, h, 30); const n = h.ring.length;
+    ctx.save(); ctx.globalCompositeOperation = darkBg(S) ? 'lighten' : 'darken'; ctx.globalAlpha = .55;
+    for (const a of [24, 18, 12, 6]) if (n - 1 - a >= 0) ctx.drawImage(h.ring[n - 1 - a], 0, 0, W, H);
+    ctx.globalAlpha = 1; ctx.drawImage(cur, 0, 0); ctx.restore();
+  },
+  halfdenoise(ctx, t) {    // half-way out of a diffusion model: blotchy noise where detail should be
+    const s = Math.floor(t * 6);
+    pixelOp(ctx, .22, true, (d, w, h) => { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const m = rnd(Math.floor(x / 9) + Math.floor(y / 9) * 61, s) < .5 ? .9 : .25, i = (y * w + x) * 4;
+      for (let c = 0; c < 3; c++) d[i + c] = d[i + c] * (1 - m * .6) + (rnd(x * 3 + c, y * 5 + s) * 255) * m * .6; } });
+    FX.posterize(ctx, t, { levels: 6, scale: .5 });
+  },
+  linescreen(ctx, t, o) {  // engraved line-screen: line thickness follows tone
+    const D = hexRgb(o.dark || '#111111'), Lc = hexRgb(o.light || '#f4f1e8'), per = (o.period || 9) * ctx.canvas.width / 1920 * .5;
+    pixelOp(ctx, .5, true, (d, w, h) => { for (let y = 0; y < h; y++) { const f = Math.abs(((y % per) / per) - .5) * 2; for (let x = 0; x < w; x++) { const i = (y * w + x) * 4, c = f < (1 - lumAt(d, i)) * 1.08 ? D : Lc; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; } } });
+  },
+  colourclash(ctx) {       // 8-colour home computer: two colours per 8×8 attribute cell
+    const ZX = ['#000000', '#0022ff', '#ff2222', '#ff22ff', '#22ff22', '#22ffff', '#ffff22', '#ffffff'].map(hexRgb);
+    pixelOp(ctx, Math.min(1, 1920 / 5 / ctx.canvas.width), false, (d, w, h) => {
+      const idx = new Uint8Array(w * h); for (let p = 0; p < w * h; p++) idx[p] = nearest(ZX, d[p * 4], d[p * 4 + 1], d[p * 4 + 2]);
+      for (let cy = 0; cy < h; cy += 8) for (let cx = 0; cx < w; cx += 8) { const cnt = new Array(8).fill(0);
+        for (let y = cy; y < Math.min(h, cy + 8); y++) for (let x = cx; x < Math.min(w, cx + 8); x++) cnt[idx[y * w + x]]++;
+        const ord = cnt.map((c, i) => [c, i]).sort((a, b) => b[0] - a[0]), A = ZX[ord[0][1]], B = ZX[ord[1][0] ? ord[1][1] : ord[0][1]];
+        for (let y = cy; y < Math.min(h, cy + 8); y++) for (let x = cx; x < Math.min(w, cx + 8); x++) { const i = (y * w + x) * 4, c = nearest([A, B], d[i], d[i + 1], d[i + 2]) ? B : A; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; } } });
+  },
+  teletext(ctx, t) {       // 40×25 teletext page made of separated 2×3 mosaic blocks
+    const W = ctx.canvas.width, H = ctx.canvas.height, gw = 80, gh = 66, c = fxCanvas('tt'); c.width = gw; c.height = gh;
+    const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(ctx.canvas, 0, H * .06, W, H * .94, 0, 0, gw, gh); const d = g.getImageData(0, 0, gw, gh).data;
+    const TT = ['#000000', '#ff0000', '#00ff00', '#ffff00', '#0000ff', '#ff00ff', '#00ffff', '#ffffff'], T = TT.map(hexRgb), cw = W / gw, ch = H * .94 / gh;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { const i = (y * gw + x) * 4, j = nearest(T, d[i], d[i + 1], d[i + 2]); if (!j) continue; ctx.fillStyle = TT[j]; ctx.fillRect(x * cw + cw * .08, H * .06 + y * ch + ch * .08, cw * .84, ch * .84); }
+    ctx.fillStyle = '#ffff00'; ctx.font = `700 ${H * .045}px ui-monospace, Menlo, monospace`; ctx.textBaseline = 'top';
+    ctx.fillText(`P302  CEEFAX 302  ${String(Math.floor(t) % 60).padStart(2, '0')}:${String(Math.floor(t * 7) % 60).padStart(2, '0')}`, W * .03, H * .01);
+  },
+  ascii(ctx, t, o, S) {       // green-screen terminal: the frame re-typed in characters
+    const W = ctx.canvas.width, H = ctx.canvas.height, cols = 112, cw = W / cols, ch = cw * 1.9, rows = Math.ceil(H / ch), c = fxCanvas('asc'); c.width = cols; c.height = rows;
+    const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(ctx.canvas, 0, 0, cols, rows); const d = g.getImageData(0, 0, cols, rows).data, ramp = ' .,:;-=+*#%@';
+    ctx.fillStyle = '#020b03'; ctx.fillRect(0, 0, W, H); ctx.font = `600 ${ch * .95}px ui-monospace, Menlo, monospace`; ctx.textBaseline = 'top'; ctx.fillStyle = o.color || '#39ff6a';
+    const inv = !darkBg(S || {});
+    for (let y = 0; y < rows; y++) { let line = ''; for (let x = 0; x < cols; x++) { let v = lumAt(d, (y * cols + x) * 4); if (inv) v = 1 - v; line += ramp[Math.min(ramp.length - 1, Math.floor(v * ramp.length))]; } ctx.fillText(line, 0, y * ch); }
+    if (Math.floor(t * 2) % 2) ctx.fillRect(W * .02, H - ch * 1.6, cw, ch * .9);
+  },
+  lcd(ctx, t) {
+    FX.palette(ctx, t, { colors: ['#0f380f', '#306230', '#8bac0f', '#9bbc0f'], block: 7, dither: 40, grid: 'rgba(15,56,15,.18)' });
+  },
+  halftone(ctx, t, o) {   // newspaper dot screen
+    const W = ctx.canvas.width, H = ctx.canvas.height, cell = (o.cell || 12) * W / 1920, cols = Math.ceil(W / cell), rows = Math.ceil(H / cell), c = fxCanvas('ht'); c.width = cols; c.height = rows;
+    const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(ctx.canvas, 0, 0, cols, rows); const d = g.getImageData(0, 0, cols, rows).data;
+    ctx.fillStyle = o.paper || '#f2ead8'; ctx.fillRect(0, 0, W, H);
+    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) { const i = (y * cols + x) * 4, r = Math.sqrt(1 - lumAt(d, i)) * cell * .66; if (r < .4) continue;
+      ctx.fillStyle = o.ink || `rgb(${d[i]},${d[i + 1]},${d[i + 2]})`; ctx.beginPath(); ctx.arc(x * cell + cell / 2 + (y % 2) * cell / 2, y * cell + cell / 2, r, 0, TAU); ctx.fill(); }
+  },
+  nightvision(ctx, t) {
+    FX.gradmap(ctx, t, { stops: ['#000a00', '#0a4d14', '#3fdc4a', '#e6ffd8'], contrast: 1.35, lift: .08 });
+    FX.noise(ctx, t, { a: .35 }); FX.scanlines(ctx, t, { a: .25 }); FX.vignette(ctx, t, { color: 'rgba(0,0,0,.95)' });
+    const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920; ctx.strokeStyle = 'rgba(200,255,200,.5)'; ctx.lineWidth = 2 * k;
+    ctx.beginPath(); ctx.moveTo(W / 2 - 40 * k, H / 2); ctx.lineTo(W / 2 + 40 * k, H / 2); ctx.moveTo(W / 2, H / 2 - 40 * k); ctx.lineTo(W / 2, H / 2 + 40 * k); ctx.stroke();
+    ctx.fillStyle = 'rgba(220,255,220,.85)'; ctx.font = `600 ${34 * k}px ui-monospace, Menlo, monospace`; if (Math.floor(t * 1.5) % 2) ctx.fillText('● REC', 80 * k, 90 * k);
+  },
+  // ---- figure effects: receive the character on its own transparent sheet ----
+  extrude(ctx, t, o, S, fig) {   // pixels pushed out into 3D blocks
+    const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920, b = (o.block || 12) * k, w = Math.max(2, W / b | 0), h = Math.max(2, H / b | 0);
+    const c = fxCanvas('ex'); c.width = w; c.height = h; const g = c.getContext('2d'); g.drawImage(fig, 0, 0, w, h);
+    const dk = fxCanvas('exd'); dk.width = w; dk.height = h; const gd = dk.getContext('2d'); gd.drawImage(c, 0, 0); gd.globalCompositeOperation = 'source-atop'; gd.fillStyle = 'rgba(0,0,0,.55)'; gd.fillRect(0, 0, w, h);
+    ctx.save(); ctx.imageSmoothingEnabled = false; const depth = o.depth || 9, ang = t * .6;
+    for (let i = depth; i > 0; i--) ctx.drawImage(dk, 0, 0, w, h, Math.cos(ang) * i * 2.2 * k, -Math.abs(Math.sin(ang)) * i * 2.2 * k - i * 1.2 * k, W, H);
+    ctx.drawImage(c, 0, 0, w, h, 0, 0, W, H); ctx.restore();
+  },
+  projection(ctx, t, o, S, fig) {   // projected onto a wall: keystoned, light cone, dust
+    const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920;
+    const g = ctx.createRadialGradient(W * .5, H * .45, H * .1, W * .5, H * .45, H * .75); g.addColorStop(0, 'rgba(255,248,225,.35)'); g.addColorStop(1, 'rgba(255,248,225,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = .92; ctx.setTransform(1, .035, -.06, .97, W * .04, -H * .01 + Math.sin(t * 7) * k); ctx.drawImage(fig, 0, 0); ctx.restore();
+    ctx.fillStyle = 'rgba(255,250,230,.5)'; for (let i = 0; i < 40; i++) { const x = (rnd(i, 1) * W + t * 20 * k * (rnd(i, 2) - .3)) % W, y = (rnd(i, 3) * H + t * 8 * k) % H; ctx.fillRect(x, y, 2 * k, 2 * k); }
+    FX.vignette(ctx, t, { color: 'rgba(0,0,0,.85)' }); FX.flicker(ctx, t, { p: .08 });
+  },
+  echo(ctx, t, o, S, fig) {   // window trails: copies left behind like a dragged window on a frozen desktop
+    const W = ctx.canvas.width, k = W / 1920, n = o.n || 9, ph = (t * .6) % 1;
+    for (let i = n; i > 0; i--) { const f = i / n; ctx.drawImage(fig, -f * 260 * k * (.4 + ph), f * 60 * k * Math.sin(t + i)); }
+    ctx.drawImage(fig, 0, 0);
+  },
+};
+const FIG_FX = new Set(['pixelwind', 'extrude', 'projection', 'echo']);
+
+/* ---------- backgrounds ---------- */
+const BGX = {
+  lined(ctx, t, P, W, H, k) { ctx.strokeStyle = 'rgba(70,120,200,.25)'; ctx.lineWidth = 2 * k; for (let y = 120 * k; y < H; y += 44 * k) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(220,60,60,.35)'; ctx.beginPath(); ctx.moveTo(200 * k, 0); ctx.lineTo(200 * k, H); ctx.stroke(); },
+  wall(ctx, t, P, W, H, k) { for (let i = 0; i < 26; i++) { ctx.fillStyle = `rgba(${rnd(i, 1) > .5 ? '0,0,0' : '255,255,255'},${.03 + rnd(i, 2) * .05})`; ctx.fillRect(rnd(i, 3) * W, rnd(i, 4) * H, (100 + rnd(i, 5) * 500) * k, (80 + rnd(i, 6) * 400) * k); } },
+  checker(ctx, t, P, W, H, k) { const s = 60 * k; for (let y = 0; y < H; y += s) for (let x = 0; x < W; x += s) if (((x + y) / s) % 2 < 1) { ctx.fillStyle = '#111'; ctx.fillRect(x, y, s, s); }
+    ctx.fillStyle = '#f2f2f2'; ctx.fillRect(W * .2, 0, W * .6, H); },
+  tech(ctx, t, P, W, H, k) { ctx.strokeStyle = 'rgba(40,40,40,.25)'; ctx.lineWidth = 1.2 * k; for (let x = 0; x < W; x += 120 * k) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(40,40,40,.6)'; ctx.font = `${22 * k}px ui-monospace, Menlo, monospace`; ctx.fillText('REF. 07-B   1:1   ⊕', 60 * k, H - 60 * k);
+    for (const [x, y] of [[60, 60], [W / k - 60, 60], [60, H / k - 110]]) { ctx.beginPath(); ctx.arc(x * k, y * k, 16 * k, 0, TAU); ctx.moveTo(x * k - 26 * k, y * k); ctx.lineTo(x * k + 26 * k, y * k); ctx.moveTo(x * k, y * k - 26 * k); ctx.lineTo(x * k, y * k + 26 * k); ctx.stroke(); } },
+  speed(ctx, t, P, W, H, k) { const cx = W / 2, cy = H * .44; ctx.strokeStyle = 'rgba(0,0,0,.75)'; for (let i = 0; i < 120; i++) { const a = rnd(i, 1) * TAU, r0 = (360 + rnd(i, 2) * 200) * k; ctx.lineWidth = (1 + rnd(i, 3) * 3) * k;
+    ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); ctx.lineTo(cx + Math.cos(a) * W, cy + Math.sin(a) * W); ctx.stroke(); } },
+  fog(ctx, t, P, W, H, k) { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(0,0,0,.4)'); g.addColorStop(1, 'rgba(160,180,220,.18)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 6; i++) { const x = ((rnd(i, 1) * W + t * 30 * k * (i % 2 ? 1 : -1)) % (W * 1.4)) - W * .2, y = H * (.55 + rnd(i, 2) * .4), r = (200 + rnd(i, 3) * 300) * k;
+      const gg = ctx.createRadialGradient(x, y, 0, x, y, r); gg.addColorStop(0, 'rgba(200,210,240,.18)'); gg.addColorStop(1, 'rgba(200,210,240,0)'); ctx.fillStyle = gg; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+    ctx.fillStyle = 'rgba(255,255,230,.85)'; ctx.beginPath(); ctx.arc(W * .82, H * .2, 60 * k, 0, TAU); ctx.fill(); },
+  monster(ctx, t, P, W, H, k) { const g = ctx.createRadialGradient(W / 2, H * .45, 50 * k, W / 2, H * .45, H); g.addColorStop(0, '#e9ff6b'); g.addColorStop(.35, '#3fa63a'); g.addColorStop(1, '#0b1a0d'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); },
+  sunset(ctx, t, P, W, H, k) { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#1b1446'); g.addColorStop(.5, '#ff4f8b'); g.addColorStop(.75, '#ffb347'); g.addColorStop(1, '#2a1446'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#ffe36b'; ctx.beginPath(); ctx.arc(W / 2, H * .72, 220 * k, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#2a1446'; for (let i = 0; i < 6; i++) ctx.fillRect(0, H * .58 + i * 26 * k, W, (4 + i * 2.5) * k); },
+  synthgrid(ctx, t, P, W, H, k) { const hz = H * .62; const g = ctx.createLinearGradient(0, 0, 0, hz); g.addColorStop(0, '#05040a'); g.addColorStop(1, '#3a0a4a'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, hz);
+    ctx.strokeStyle = 'rgba(255,40,200,.75)'; ctx.lineWidth = 2 * k; for (let i = -24; i <= 24; i++) { ctx.beginPath(); ctx.moveTo(W / 2 + i * 30 * k, hz); ctx.lineTo(W / 2 + i * 260 * k, H); ctx.stroke(); }
+    for (let j = 0; j < 14; j++) { const f = ((j + (t * 1.2) % 1) / 14), y = hz + Math.pow(f, 2.2) * (H - hz); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); } },
+  starburst(ctx, t, P, W, H, k) { const cx = W / 2, cy = H * .45; for (let i = 0; i < 24; i++) { ctx.fillStyle = i % 2 ? '#ffd23a' : '#ff8a1f'; ctx.beginPath(); ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, W, i / 24 * TAU + t * .1, (i + 1) / 24 * TAU + t * .1); ctx.fill(); } },
+  cggrid(ctx, t, P, W, H, k) { ctx.strokeStyle = 'rgba(80,200,255,.5)'; ctx.lineWidth = 2 * k; const vx = W / 2, vy = H * .42;
+    for (let i = 0; i <= 16; i++) { const x = i / 16 * W; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(vx + (x - vx) * .3, vy - H * .1); ctx.moveTo(x, H); ctx.lineTo(vx + (x - vx) * .3, vy + H * .15); ctx.stroke(); }
+    for (let j = 1; j < 8; j++) { const f = j / 8, x0 = vx - (vx * (1 - f * .7)), x1 = vx + (vx * (1 - f * .7)); ctx.strokeRect(x0, vy - H * .1 - (1 - f) * H * .42, x1 - x0, (1 - f) * H * .67 + H * .25); } },
+  brick(ctx, t, P, W, H, k) { const bw = 120 * k, bh = 48 * k; ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 4 * k;
+    for (let y = 0, r = 0; y < H; y += bh, r++) for (let x = (r % 2) * -bw / 2; x < W; x += bw) { ctx.fillStyle = `rgba(255,255,255,${.02 + rnd(x | 0, y | 0) * .05})`; ctx.fillRect(x, y, bw, bh); ctx.strokeRect(x, y, bw, bh); } },
+  storm(ctx, t, P, W, H, k) { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#2a1208'); g.addColorStop(.6, '#6b2410'); g.addColorStop(1, '#120805'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const s = Math.floor(t * 3); if (rnd(s, 1) < .35) { ctx.strokeStyle = '#fff6d0'; ctx.lineWidth = 5 * k; ctx.shadowColor = '#fff'; ctx.shadowBlur = 30 * k; let x = rnd(s, 2) * W, y = 0; ctx.beginPath(); ctx.moveTo(x, y);
+      while (y < H * .6) { x += (rnd(s, y | 0) - .5) * 120 * k; y += 60 * k; ctx.lineTo(x, y); } ctx.stroke(); ctx.shadowBlur = 0; } },
+  splatter(ctx, t, P, W, H, k) { const cols = ['#ff2bd6', '#00e5ff', '#e6ff00', '#7d00ff', '#111'];
+    for (let i = 0; i < 60; i++) { ctx.fillStyle = cols[i % 5]; const x = rnd(i, 1) * W, y = rnd(i, 2) * H, r = (6 + rnd(i, 3) * 40) * k; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+      for (let j = 0; j < 5; j++) { ctx.beginPath(); ctx.arc(x + (rnd(i, j + 5) - .5) * r * 5, y + (rnd(i, j + 9) - .5) * r * 5, r * .18, 0, TAU); ctx.fill(); } }
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 6 * k; for (let i = 0; i < 6; i++) { const x = rnd(i, 30) * W, y = rnd(i, 31) * H; ctx.beginPath(); for (let j = 0; j < 6; j++) ctx.lineTo(x + j * 24 * k, y + (j % 2) * 24 * k); ctx.stroke(); } },
+  sky(ctx, t, P, W, H, k) { ctx.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 5; i++) { const x = ((rnd(i, 1) * W + t * 12 * k) % (W + 400 * k)) - 200 * k, y = (.1 + rnd(i, 2) * .35) * H;
+    for (let j = 0; j < 4; j++) { ctx.beginPath(); ctx.arc(x + j * 50 * k, y + (j % 2) * 12 * k, (40 + rnd(i, j) * 30) * k, 0, TAU); ctx.fill(); } }
+    ctx.fillStyle = 'rgba(70,150,60,.5)'; ctx.fillRect(0, H * .86, W, H * .14); },
+  dusk(ctx, t, P, W, H, k) { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#22305c'); g.addColorStop(.55, '#e88a6b'); g.addColorStop(1, '#3a2a40'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const s = ctx.createRadialGradient(W * .75, H * .55, 0, W * .75, H * .55, 380 * k); s.addColorStop(0, 'rgba(255,230,170,.8)'); s.addColorStop(1, 'rgba(255,230,170,0)'); ctx.fillStyle = s; ctx.fillRect(0, 0, W, H); },
+  dunes(ctx, t, P, W, H, k) { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#ffb067'); g.addColorStop(.6, '#ffe0a8'); g.addColorStop(1, '#f0c27a'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#fff4d6'; ctx.beginPath(); ctx.arc(W * .8, H * .25, 90 * k, 0, TAU); ctx.fill();
+    for (let i = 0; i < 3; i++) { ctx.fillStyle = ['#e9a85e', '#d98f45', '#c77a33'][i]; ctx.beginPath(); ctx.moveTo(0, H); for (let x = 0; x <= W; x += 20 * k) ctx.lineTo(x, H * (.7 + i * .09) + Math.sin(x / k * .004 + i * 2) * 40 * k); ctx.lineTo(W, H); ctx.fill(); } },
+  candy(ctx, t, P, W, H, k) { const s = 90 * k; for (let x = -H; x < W; x += s * 2) { ctx.fillStyle = 'rgba(255,140,200,.35)'; ctx.beginPath(); ctx.moveTo(x, H); ctx.lineTo(x + s, H); ctx.lineTo(x + s + H, 0); ctx.lineTo(x + H, 0); ctx.fill(); }
+    for (let i = 0; i < 30; i++) { ctx.fillStyle = ['#ff7ab6', '#7ee0ff', '#c6ff7a', '#fff07a'][i % 4]; ctx.beginPath(); ctx.arc(rnd(i, 1) * W, rnd(i, 2) * H, (8 + rnd(i, 3) * 14) * k, 0, TAU); ctx.fill(); } },
+  moon(ctx, t, P, W, H, k) { ctx.fillStyle = '#e8e0f5'; ctx.beginPath(); ctx.arc(W * .78, H * .22, 110 * k, 0, TAU); ctx.fill(); ctx.fillStyle = '#1d1427'; ctx.beginPath(); ctx.arc(W * .74, H * .19, 100 * k, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#0d0814'; ctx.beginPath(); ctx.moveTo(0, H); for (let x = 0; x <= W; x += 60 * k) ctx.lineTo(x, H * .8 - (rnd(x | 0, 1) * 140 + (x % (180 * k) < 60 * k ? 120 : 0)) * k); ctx.lineTo(W, H); ctx.fill(); },
+  aura(ctx, t, P, W, H, k) { const cx = W / 2, cy = H * .5; for (let i = 0; i < 70; i++) { const a = i / 70 * TAU + Math.sin(t * 6 + i) * .05, L = (320 + rnd(i, Math.floor(t * 10)) * 260) * k;
+    ctx.strokeStyle = i % 3 ? 'rgba(255,200,0,.7)' : 'rgba(255,120,0,.55)'; ctx.lineWidth = (8 + rnd(i, 2) * 18) * k; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * 150 * k, cy + Math.sin(a) * 200 * k); ctx.lineTo(cx + Math.cos(a) * L, cy + Math.sin(a) * L * 1.1); ctx.stroke(); } },
+  stage(ctx, t, P, W, H, k) { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#ff7a3a'); g.addColorStop(.55, '#ffd36b'); g.addColorStop(.56, '#6b3a1f'); g.addColorStop(1, '#2a160b'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(40,20,10,.6)'; for (let i = 0; i < 9; i++) ctx.fillRect(i * W / 8 - 20 * k, H * .3, 40 * k, H * .26); },
+  graticule(ctx, t, P, W, H, k) { ctx.strokeStyle = 'rgba(92,255,138,.16)'; ctx.lineWidth = 1.5 * k; const s = H / 8;
+    for (let x = W / 2 % s; x < W; x += s) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); } for (let y = 0; y < H; y += s) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); } },
+  room(ctx, t, P, W, H, k) { const x0 = W * .25, x1 = W * .75, y0 = H * .15, y1 = H * .78; ctx.fillStyle = 'rgba(0,0,0,.06)'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 3 * k; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0); for (const [a, b] of [[0, 0], [W, 0], [0, H], [W, H]]) { ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(a ? x1 : x0, b ? y1 : y0); ctx.stroke(); }
+    ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fillRect(x1 - 160 * k, y0 + 60 * k, 110 * k, 140 * k); },
+  stars(ctx, t, P, W, H, k) { for (let i = 0; i < 120; i++) { ctx.fillStyle = `rgba(255,255,255,${.3 + .7 * Math.abs(Math.sin(t * 2 + i))})`; ctx.fillRect(rnd(i, 1) * W, rnd(i, 2) * H, 2.5 * k, 2.5 * k); } },
+  sun(ctx, t, P, W, H, k) { const cx = W * .5, cy = H * .42; for (let i = 0; i < 14; i++) { ctx.fillStyle = i % 2 ? '#ffe36b' : '#ff9e1b'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, W, i / 14 * TAU, (i + 1) / 14 * TAU); ctx.fill(); }
+    ctx.fillStyle = '#00c2c7'; ctx.fillRect(0, H * .78, W, H * .22); ctx.strokeStyle = '#fff'; ctx.lineWidth = 5 * k; for (let x = 0; x < W; x += 80 * k) { ctx.beginPath(); ctx.arc(x, H * .8, 30 * k, Math.PI, 0); ctx.stroke(); } },
+};
+
 /* ---------- score → keyframes ---------- */
 const ease = x => { const c1 = 1.70158, c3 = c1 + 1; return x >= 1 ? 1 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); }; // overshoot = cartoon snap
+const STYLE_ALIASES = { inkpunch:'pop', cubist:'cubistmosh', trails:'windowtrails', glitch:'rgb', channelshift:'rgb', print:'comic', inkbleed:'inkbleed', watercolour:'paint', pixel8:'pixel', lcd:'pixel', vhstape:'vhs' };
+const HOLO_PALETTES = { cyan:['#39f3ff'], green:['#59ff8a'], amber:['#ffb53a'], red:['#ff3344'], blue:['#3a6bff'], white:['#e8eef7'], ghost:['#e8eef7'], security:['#59ff8a', '#ff4fd8'], rose:['#ff7aa8', '#ffd23a'], gold:['#ffd23a'], pink:['#ff4fd8'] };
 function compile(score, bpm, bpb, offset = 0) {
   const spb = 60 / bpm, beatTime = ([bar, beat]) => offset + ((bar - 1) * bpb + (beat - 1)) * spb;
   const ev = score.map((e, idx) => ({ ...e, idx, t: beatTime(e.at) })).sort((a, b) => a.t - b.t || a.idx - b.idx);
-  let pose = 'neutral', set = {}, style = 'lineart', color = null, character = 'hashbrown';
-  const keys = [{ t: 0, params: { ...BASE }, style, color, character, pose: 'neutral', idx: -1 }], talks = [];
+  let pose = 'neutral', set = {}, cam = {}, grid = 1, style = 'lineart', color = null, color2 = null, character = 'hashbrown';
+  const keys = [{ t: 0, params: { ...BASE }, style, color, color2, character, grid, pose: 'neutral', idx: -1 }], talks = [];
+  const names = o => Object.keys(o).join(', ');
   for (const e of ev) {
-    if (e.pose) { if (!POSES[e.pose]) throw new Error(`unknown pose '${e.pose}' — try: ${Object.keys(POSES).join(', ')}`); pose = e.pose; set = {}; }
-    if (e.set) set = { ...set, ...e.set };
-    if (e.style) { if (!STYLES[e.style]) throw new Error(`unknown style '${e.style}' — try: ${Object.keys(STYLES).join(', ')}`); style = e.style; color = e.color || null; }
-    if (e.character) { if (!CHARACTERS[e.character]) throw new Error(`unknown character '${e.character}' — try: ${Object.keys(CHARACTERS).join(', ')}`); character = e.character; }
+    if (e.pose) { if (!POSES[e.pose]) throw new Error(`unknown pose '${e.pose}' — try: ${names(POSES)}`);
+      if (POSES[e.pose].layer) set = { ...set, ...poseParams(e.pose) }; else { pose = e.pose; set = {}; } }
+    if (e.set != null) { if (typeof e.set === 'string') { const [key, f] = SET_ALIASES[e.set] || [e.set, 1]; if (!(key in BASE)) throw new Error(`unknown setting '${e.set}'`); set = { ...set, [key]: (+e.to) * f }; } else set = { ...set, ...e.set }; }
+    if (e.style) { const id = STYLE_ALIASES[e.style] || e.style; if (!STYLES[id]) throw new Error(`unknown style '${e.style}' — try: ${names(STYLES)}`); style = id;
+      const pal = e.palette && HOLO_PALETTES[String(e.palette).split(/[\s:]/)[0].toLowerCase()]; color = e.color || (pal && pal[0]) || null; color2 = e.color2 || (pal && pal[1]) || null; }
+    const who = e.who || e.preset || e.character || e.create;
+    if (who) { const id = who === 'doug' ? 'fridge' : who; if (!CHARACTERS[id]) throw new Error(`unknown character '${who}' — try: ${names(CHARACTERS)}`); character = id; }
+    if (e.camera != null) { const c = CAMERAS[e.camera]; if (!c) throw new Error(`unknown camera '${e.camera}' — try 1–4, or full, close, medium, handheld`); cam = { ...c }; }
+    if (e.grid != null) grid = Math.max(1, Math.min(7, +e.grid || 1));
     if (e.talk) talks.push([e.t, e.t + e.talk * spb]);
-    keys.push({ t: e.t, params: { ...BASE, ...POSES[pose], ...set }, style, color, character, pose, idx: e.idx });
+    keys.push({ t: e.t, params: { ...BASE, ...poseParams(pose), ...set, ...cam }, style, color, color2, character, grid, pose, idx: e.idx });
   }
   const duration = (ev.length ? ev[ev.length - 1].t : 0) + bpb * spb * 1.5;
   return { keys, talks, duration };
@@ -781,7 +1465,7 @@ function evaluate(C, t) {
   // secondary motion that's always on: blinking + lip flap while talking
   const bp = t % 3.4; if (bp < .14) P.eyeOpen *= Math.abs(bp / .07 - 1);
   for (const [s, e] of C.talks) if (t >= s && t < e) { P.mouthOpen += Math.abs(Math.sin(t * 17)) * 14; P.mouthW *= .85; }
-  return { P, S: { ...STYLES[b.style], color: b.color }, who: b.character, styleName: b.style, pose: b.pose, idx: b.idx };
+  return { P, S: { ...STYLES[b.style], color: b.color, color2: b.color2 || STYLES[b.style].color2 }, who: b.character, styleName: b.style, pose: b.pose, grid: b.grid, idx: b.idx };
 }
 
 /* ---------- studio: transport, live puppeting, panels, script recording ---------- */
@@ -889,15 +1573,7 @@ function drawMeter(t) {
 let C = compile([], 100, 4), lineOf = [], playing = false, t0 = performance.now() / 1000, tPaused = 0, hasAudio = false;
 let live = null, liveP = null, liveBase = null, tab = 'character', offline = false;
 
-const STYLE_SWATCHES = [
-  { label:'Line art', style:'lineart' }, { label:'Pencil', style:'pencil' }, { label:'Blueprint', style:'blueprint' }, { label:'Ink', style:'ink' }, { label:'Paint', style:'paint' },
-  { label:'Hologram pink', style:'hologram', color:'#ff4fd8' }, { label:'Hologram cyan', style:'hologram', color:'#39f3ff' },
-  { label:'Hologram gold', style:'hologram', color:'#ffd23a' }, { label:'Hologram green', style:'hologram', color:'#59ff8a' },
-  { label:'Comic', style:'comic' }, { label:'Risograph', style:'riso' }, { label:'Sticker', style:'sticker' }, { label:'Chalkboard', style:'chalk' },
-  { label:'8-bit', style:'pixel' }, { label:'Crayon', style:'crayon' }, { label:'Newsprint', style:'newsprint' }, { label:'Cut paper', style:'cutpaper' },
-  { label:'Pixel wind', style:'pixelwind' }, { label:'Pop burst', style:'pop' }, { label:'Holo foil', style:'foil' }, { label:'RGB glitch', style:'rgb' },
-  { label:'VHS', style:'vhs' }, { label:'Acid trip', style:'acid' }, { label:'Colour static', style:'static' },
-];
+const STYLE_SWATCHES = STYLE_CATS.flatMap(([cat, list]) => list.map(([label, style, color, color2]) => ({ cat, label, style, color, color2 })));
 const SLIDERS = {
   Body:  [['squash','Squash', .8, 1.2, .01], ['tilt','Lean', -20, 20, .5], ['bounce','Bounce', 0, 20, .5], ['bx','Slide', -150, 150, 1], ['zoom','Camera zoom', .6, 1.6, .01]],
   Eyes:  [['eyeOpen','Open', 0, 1.5, .01], ['eyeSize','Size', 10, 30, .5], ['eyeGap','Spacing', 30, 70, .5], ['lookX','Look ↔', -12, 12, .5], ['lookY','Look ↕', -10, 10, .5]],
@@ -906,13 +1582,14 @@ const SLIDERS = {
   'Arms / paws': [['lhY','Left height', -80, 130, 1], ['rhY','Right height', -80, 130, 1], ['wave','Wave', 0, 1.5, .05]],
   'Ears & tail': [['earL','Left ear', -50, 30, .5], ['earR','Right ear', -30, 50, .5], ['tailWag','Tail wag', 0, 3, .05], ['tongue','Tongue', 0, 1, .01]],
 };
-const LABELS = { fridge:'Fridge', hashbrown:'Hashbrown' };
+const LABELS = { fridge:'Doug (fridge)', hashbrown:'Hashbrown' };
+for (const [id, c] of Object.entries(CAST)) if (id !== 'doug') LABELS[id] = c.label;
 const cap = s => s[0].toUpperCase() + s.slice(1);
 
 /* ----- script ----- */
 function rebuild() {
   try {
-    const score = new Function(`return (${code.value});`)();
+    const score = new Function('doug', 'glitch', `return (${code.value});`)('fridge', 'glitch');
     C = compile(score, +bpmEl.value || 100, +bpbEl.value || 4, beatOffset());
     lineOf = []; code.value.split('\n').forEach((l, n) => { if (/\bat\s*:/.test(l) && !/^\s*\/\//.test(l)) lineOf.push(n); });
     err.textContent = '';
@@ -923,7 +1600,7 @@ function barBeat(t, step) { const q = Math.round(Math.max(0, t - beatOffset()) /
 const fmtVal = v => typeof v === 'string' ? `'${v}'` : +(+v).toFixed(2);
 function fmtEvent(at, ev) {
   const parts = [`at: [${at[0]}, ${at[1]}]`];
-  for (const k of ['character', 'style', 'color', 'pose']) if (ev[k] != null) parts.push(`${k}: ${fmtVal(ev[k])}`);
+  for (const k of ['character', 'style', 'color', 'color2', 'pose']) if (ev[k] != null) parts.push(`${k}: ${fmtVal(ev[k])}`);
   if (ev.set && Object.keys(ev.set).length) parts.push(`set: { ${Object.entries(ev.set).map(([k, v]) => `${k}: ${fmtVal(v)}`).join(', ')} }`);
   return `{ ${parts.join(', ')} },`;
 }
@@ -947,7 +1624,7 @@ function setPlaying(p) {
 function enterLive() {
   if (live) return;
   const e = evaluate(C, now());
-  live = { character: e.who, style: e.styleName, color: e.S.color, pose: e.pose, set: {} };
+  live = { character: e.who, style: e.styleName, color: e.S.color, color2: e.S.color2 || null, pose: e.pose, set: {} };
   liveBase = { ...live }; liveP = { ...e.P };
 }
 function act(change, commit = true) {
@@ -957,15 +1634,15 @@ function act(change, commit = true) {
   }
   enterLive();
   if (change.character) live.character = change.character;
-  if (change.style) { live.style = change.style; live.color = change.color || null; }
-  if (change.pose) { live.pose = change.pose; live.set = {}; }
+  if (change.style) { live.style = change.style; live.color = change.color || null; live.color2 = change.color2 || null; }
+  if (change.pose) { if (POSES[change.pose].layer) live.set = { ...live.set, ...poseParams(change.pose) }; else { live.pose = change.pose; live.set = {}; } }
   if (change.set) live.set = { ...live.set, ...change.set };
   updateMode(); refreshThumbs(true);
 }
 function liveDiff() {
   const d = {};
   if (live.character !== liveBase.character) d.character = live.character;
-  if (live.style !== liveBase.style || live.color !== liveBase.color) { d.style = live.style; if (live.color) d.color = live.color; }
+  if (live.style !== liveBase.style || live.color !== liveBase.color) { d.style = live.style; if (live.color) d.color = live.color; if (live.color2) d.color2 = live.color2; }
   if (live.pose !== liveBase.pose) d.pose = live.pose;
   if (Object.keys(live.set).length) d.set = live.set;
   return d;
@@ -989,19 +1666,22 @@ function updateMode() {
 
 /* ----- panels ----- */
 function look() { // what's on stage right now
-  if (live) return { who: live.character, style: live.style, color: live.color, pose: live.pose };
-  const e = evaluate(C, now()); return { who: e.who, style: e.styleName, color: e.S.color, pose: e.pose };
+  if (live) return { who: live.character, style: live.style, color: live.color, color2: live.color2, pose: live.pose, set: live.set };
+  const e = evaluate(C, now()); return { who: e.who, style: e.styleName, color: e.S.color, color2: e.S.color2, pose: e.pose, set: {} };
 }
-function tiles(items) {
-  tabbody.innerHTML = `<div class="grid">${items.map((it, i) => `<button class="tile" data-i="${i}" aria-pressed="false"><canvas width="300" height="216"></canvas><span>${it.label}</span></button>`).join('')}</div>`;
+function tiles(items) {   // tiles grouped under category headings, like the reference panel
+  const groups = []; items.forEach((it, i) => { const g = groups[groups.length - 1]; if (!g || g.cat !== it.cat) groups.push({ cat: it.cat, list: [[it, i]] }); else g.list.push([it, i]); });
+  tabbody.innerHTML = groups.map(g => `${g.cat ? `<div class="cat"><span>${g.cat}</span><span>${g.list.length}</span></div>` : ''}<div class="grid">${g.list.map(([it, i]) =>
+    `<button class="tile" data-i="${i}" aria-pressed="false"><canvas width="300" height="216"></canvas><span>${it.label}</span></button>`).join('')}</div>`).join('');
   tabbody.querySelectorAll('.tile[data-i]').forEach(b => b.onclick = () => act(items[+b.dataset.i].change));
 }
-let tabItems = [], thumbKey = '';
+let tabItems = [];
 function buildTab() {
   document.querySelectorAll('[role=tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
-  if (tab === 'character') tabItems = Object.keys(CHARACTERS).map(c => ({ label: LABELS[c] || cap(c), change: { character: c } }));
-  if (tab === 'style') tabItems = STYLE_SWATCHES.map(s => ({ label: s.label, change: { style: s.style, ...(s.color ? { color: s.color } : {}) } }));
-  if (tab === 'pose') tabItems = Object.keys(POSES).map(p => ({ label: cap(p), change: { pose: p } }));
+  if (tab === 'character') { const ids = Object.keys(CHARACTERS), cast = id => !!CAST[id];
+    tabItems = [...ids.filter(id => !cast(id)), ...ids.filter(cast)].map(c => ({ cat: cast(c) ? "Doug's cast" : 'Characters', label: LABELS[c] || cap(c), change: { character: c } })); }
+  if (tab === 'style') tabItems = STYLE_SWATCHES.map(q => ({ cat: q.cat, label: q.label, change: { style: q.style, ...(q.color ? { color: q.color } : {}), ...(q.color2 ? { color2: q.color2 } : {}) } }));
+  if (tab === 'pose') tabItems = POSE_CATS.flatMap(([cat, list]) => list.filter(q => POSES[q]).map(q => ({ cat, label: cap((q.startsWith('feel-') ? q.slice(5) : q).replace(/-/g, ' ')), change: { pose: q } })));
   if (tab === 'design') {
     tabItems = [];
     tabbody.innerHTML = Object.entries(SLIDERS).map(([g, list]) => `<fieldset><legend>${g}</legend>${list.map(([k, l, a, b, st]) =>
@@ -1012,25 +1692,29 @@ function buildTab() {
     });
   } else tiles(tabItems);
   if (tab === 'character') { const b = document.createElement('button'); b.className = 'tile import'; b.innerHTML = '<span>＋ Import SVG character…</span>'; b.onclick = () => $('svgFile').click(); tabbody.querySelector('.grid').appendChild(b); }
-  thumbKey = ''; refreshThumbs(true);
+  tabbody.scrollTop = 0; refreshThumbs(true);
 }
 document.querySelectorAll('[role=tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; buildTab(); });
 
-function refreshThumbs(force) {
-  const L = look(), key = JSON.stringify([tab, L]);
-  if (!force && key === thumbKey) return; thumbKey = key;
+function refreshThumbs(force) {   // draws only tiles on screen, a few per call, so 100+ styles stay smooth
   if (tab === 'design') return;
-  tabbody.querySelectorAll('.tile[data-i]').forEach((b, i) => {
-    const ch = tabItems[i].change, who = ch.character || L.who, style = ch.style || L.style, color = ch.style ? ch.color || null : L.color, pose = ch.pose || L.pose;
-    const c2 = b.querySelector('canvas').getContext('2d');
-    drawCharacter(c2, { ...BASE, ...POSES[pose] }, { ...STYLES[style], color }, 0.4, who);
+  const L = look(), base = JSON.stringify(L), vh = innerHeight || 800; let budget = force ? 10 : 5;
+  tabbody.querySelectorAll('.tile[data-i]').forEach(b => {
+    const i = +b.dataset.i, ch = tabItems[i].change;
     const on = (ch.character && ch.character === L.who) || (ch.pose && ch.pose === L.pose) || (ch.style && ch.style === L.style && (ch.color || null) === (L.color || null));
     b.setAttribute('aria-pressed', !!on);
+    const r = b.getBoundingClientRect(); if (r.bottom < -150 || r.top > vh + 150 || r.width === 0) return;
+    const tk = base + '|' + i + '|' + tab; if (b.dataset.k === tk || budget-- <= 0) return; b.dataset.k = tk;
+    const who = ch.character || L.who, style = ch.style || L.style, color = ch.style ? ch.color || null : L.color, color2 = ch.style ? ch.color2 || null : L.color2;
+    const layered = ch.pose && POSES[ch.pose].layer, P = { ...BASE, ...poseParams(ch.pose && !layered ? ch.pose : L.pose), ...(L.set || {}), ...(layered ? poseParams(ch.pose) : {}) };
+    drawCharacter(b.querySelector('canvas').getContext('2d'), P, { ...STYLES[style], color, color2: color2 || STYLES[style].color2 }, 0.4, who);
   });
 }
+tabbody.addEventListener('scroll', () => refreshThumbs(false), { passive: true });
+addEventListener('scroll', () => refreshThumbs(false), { passive: true });
 
 /* ----- render loop ----- */
-function renderScoreAt(t) { const e = evaluate(C, t); drawCharacter(ctx, react(e.P, t), e.S, t, e.who); return e; }
+function renderScoreAt(t) { const e = evaluate(C, t); drawScene(ctx, react(e.P, t), e.S, t, e.who, e.grid, e.styleName); return e; }
 let fc = 0;
 function frame() {
   if (offline) return;
@@ -1040,11 +1724,11 @@ function frame() {
     const tw = performance.now() / 1000, target = { ...BASE, ...POSES[live.pose], ...live.set };
     for (const k in BASE) liveP[k] += (target[k] - liveP[k]) * .22;
     shownP = { ...liveP }; const bp = tw % 3.4; if (bp < .14) shownP.eyeOpen *= Math.abs(bp / .07 - 1);
-    drawCharacter(ctx, shownP, { ...STYLES[live.style], color: live.color }, tw, live.character);
+    drawCharacter(ctx, shownP, { ...STYLES[live.style], color: live.color, color2: live.color2 || STYLES[live.style].color2 }, tw, live.character);
   } else {
     // paused: keep breathing/boiling on the wall clock so the frame never looks dead
     const e = evaluate(C, t); shownP = react(e.P, t); idx = e.idx;
-    drawCharacter(ctx, shownP, e.S, playing ? t : t + (performance.now() / 1000 % 1000), e.who);
+    drawScene(ctx, shownP, e.S, playing ? t : t + (performance.now() / 1000 % 1000), e.who, e.grid, e.styleName);
   }
   if (song.an) drawMeter(t);
   const line = lineOf[idx]; hl.hidden = line == null || !!live;

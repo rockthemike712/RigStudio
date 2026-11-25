@@ -5,6 +5,15 @@ A code-driven character animation engine: **every frame is a pure function of `(
 - **Rig**: the character is a set of numbers (`eyeOpen`, `browInner`, `mouthCurve`, `rhY`, …), with no drawings. Because they're numbers, anything can tween into anything.
 - **Poses**: named partial parameter sets (`thinking`, `furious`, `laughing`, …).
 - **Styles**: renderers that draw the *same* rig geometry differently (`lineart`, `pencil`, `blueprint`, `comic`, `riso`, `sticker`, `chalk`, `pixel`, `crayon`, `newsprint`, `cutpaper`, glitch styles `pixelwind`, `pop`, `foil`, `rgb`, `vhs`, `acid`, `static`, `ink`, `hologram`, `paint`). Swapping a style doesn't touch the animation.
+- **Catalogue (rebuilt from the reference video)**:
+  - **Styles:** 118 styles in 13 categories: House, Drawn, Print and paste, Comics, Spooky, 1980s and 1990s, Cartoon, Pixels, Screens and light, Glitch: signal, Glitch: time, Hologram (8 palettes), and Originals.
+  - **Poses:** 64 poses in 6 groups: classic, 14 attitudes, 12 feelings, and eye, mouth and hand poses. Eye, mouth and hand poses (`eyes-suspicious`, `mouth-gasp`, `count3`, `thumbsup`…) layer on top of the current body pose.
+  - **Script commands:**
+    - `who` / `preset` picks a cast member, Doug's builds: child, girl, teen, boss, clerk, old man, professor, bouncer, dancer.
+    - `camera` picks a shot: 1 full, 2 close, 3 medium, 4 handheld.
+    - `grid: 3|5|7` shows the same moment in many styles at once.
+    - `set: 'body.w', to: 1.05` sets a value by name.
+    - `palette` picks a hologram colour.
 - **Characters**: `fridge` and `hashbrown` (a red-and-white Pembroke, modelled on his owner's ink drawing; standing 3/4 view). They read the same params, so every pose and style works on both. Switch with `{ at: [10, 1], character: 'hashbrown' }`. Characters can also use extra channels (Hashbrown uses `earL`, `earR`, `tailWag` and `tongue`), which other characters ignore.
 - **Score**: events in musical time, `{ at: [bar, beat], pose | style | set | talk }`, compiled to keyframes with an overshoot ease, plus always-on secondary motion (breathing, blinking, 12fps line "boil", lip flap).
 
@@ -38,7 +47,13 @@ This steps time frame by frame in headless Chromium and pipes the frames to ffmp
 
 ## Extending
 - New expression: add an entry to `POSES`.
-- New look: add an entry to `STYLES` (colours, line weight, jitter, passes, glow, fills).
+- New look: add an entry to `STYLES`. A style sets:
+  - lines: colour, weight, jitter, passes, glow
+  - fills per role: flat colour, `grad`, `hatch`, `dots`, `scribble`, `stripes`, `spray`, `foil`, `rainbow` or `noise`
+  - optional `bgFx` background and `layers` (printed passes)
+  - a `post` effect chain from `FX`: threshold, gradmap, palette, teletext, ascii, pixelsort, datamosh, trails, melt, cubist and more
+
+  Then list it in `STYLE_CATS`.
 - **New character from art (recommended)**: an SVG rig. You can load it with "Import SVG character…" in the Character tab, or embed it like `characters/hashbrown.svg`. The format:
   - `viewBox="0 0 1000 1000"`.
   - One `<g id="…" data-pivot="x,y">` per part: `tail`, `body`, `leg-back`, `leg-front-left`, `leg-front-right`, `chest-ruff`, `head`, `ear-left`, `ear-right`, `nose`.
