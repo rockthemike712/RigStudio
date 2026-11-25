@@ -157,6 +157,8 @@ const BASE = {
   earL:0, earR:0, tailWag:1, tongue:0,
   // camera, body build, hand shapes
   camY:0, shake:0, bw:1, bh:1, handL:0, handR:0, eyeScale:1,
+  // build & view: Doug is a real 3D box; Hashbrown maps these onto his 2D drawing
+  bodyW:1, bodyH:1, bodyD:.42, seam:.5, yaw:18, pitch:8, lean:0, twist:0, eyeShape:0, headSize:1, handSize:1,
 };
 
 const POSES = {
@@ -187,8 +189,8 @@ Object.assign(POSES, {
   beaten:     { eyeOpen:.55, lookY:8, browInner:-16, mouthCurve:-12, squash:.92, tilt:5, lhY:130, rhY:130, earL:-45, earR:45, tailWag:0 },
   pleased:    { eyeOpen:.5, mouthCurve:18, mouthW:32, browY:-84, squash:1.03, tilt:-3, lhX:-140, lhY:60, rhX:140, rhY:60, handL:1, handR:1, tailWag:1.8 },
   fedup:      { eyeOpen:.45, browInner:6, mouthCurve:-6, mouthW:26, tilt:-4, lookX:6, lhX:-110, lhY:40, rhX:110, rhY:40, lhR:30, rhR:-30, handL:7, handR:7 },
-  secret:     { lookX:-10, eyeOpen:.7, mouthCurve:4, mouthW:14, mouthOpen:4, tilt:-8, bx:-25, rhX:60, rhY:20, rhR:-60, handR:3, earL:-8 },
-  you:        { lookX:10, browY:-84, mouthCurve:12, tilt:4, rhX:185, rhY:20, rhR:-80, handR:2 },
+  secret:     { yaw:-14, lookX:-10, eyeOpen:.7, mouthCurve:4, mouthW:14, mouthOpen:4, tilt:-8, bx:-25, rhX:60, rhY:20, rhR:-60, handR:3, earL:-8 },
+  you:        { yaw:32, lookX:10, browY:-84, mouthCurve:12, tilt:4, rhX:185, rhY:20, rhR:-80, handR:2 },
   counting:   { lookY:-6, lookX:4, mouthCurve:4, browTilt:6, rhX:150, rhY:-10, handR:6, lhX:-150, lhY:60 },
   dunno:      { browY:-96, browInner:-10, mouthCurve:-8, mouthW:22, squash:.95, tilt:-3, lhX:-185, lhY:20, rhX:185, rhY:20, lhR:60, rhR:-60, handL:7, handR:7 },
   despair:    { eyeOpen:.3, browInner:-22, mouthOpen:10, mouthCurve:-14, squash:.9, tilt:10, lhX:-60, lhY:-40, rhX:60, rhY:-40, handL:3, handR:3, earL:-50, earR:50, tailWag:0 },
@@ -198,11 +200,11 @@ Object.assign(POSES, {
   'feel-happy':      { mouthCurve:18, mouthOpen:10, mouthW:36, eyeOpen:.75, browY:-88, bounce:6, tongue:.8, tailWag:2.2 },
   'feel-excited':    { eyeOpen:1.25, eyeSize:22, mouthOpen:20, mouthCurve:14, browY:-100, bounce:14, lhX:-170, lhY:-50, rhX:170, rhY:-50, handL:3, handR:3, tailWag:3, tongue:1 },
   'feel-furious':    { eyeOpen:.65, eyeSize:16, browInner:26, browY:-68, mouthCurve:-16, mouthOpen:10, squash:.92, lhY:100, rhY:100, handL:1, handR:1, earL:-40, earR:40, tailWag:0 },
-  'feel-sulking':    { eyeOpen:.5, lookX:-10, lookY:5, browInner:-6, mouthCurve:-10, mouthW:16, tilt:-7, lhX:-70, lhY:70, rhX:70, rhY:70, earL:-30, earR:30, tailWag:0 },
+  'feel-sulking':    { yaw:-8, eyeOpen:.5, lookX:-10, lookY:5, browInner:-6, mouthCurve:-10, mouthW:16, tilt:-7, lhX:-70, lhY:70, rhX:70, rhY:70, earL:-30, earR:30, tailWag:0 },
   'feel-flirting':   { eyeOpen:.55, lookX:8, browTilt:-8, mouthCurve:14, mouthW:22, tilt:7, bx:10, rhX:120, rhY:-10, rhR:-40, handR:3, tailWag:2 },
   'feel-bored':      { eyeOpen:.35, lookY:4, browY:-74, mouthCurve:-2, mouthW:18, tilt:9, squash:.97, lhY:120, rhY:120, earL:-20, earR:20, tailWag:.2 },
   'feel-terrified':  { eyeOpen:1.45, eyeSize:24, browInner:-20, browY:-104, mouthOpen:22, mouthW:20, mouthCurve:-10, squash:.94, bx:-30, lhX:-80, lhY:-10, rhX:80, rhY:-10, handL:3, handR:3, earL:-45, earR:45 },
-  'feel-proud':      { eyeOpen:.6, mouthCurve:12, browY:-88, squash:1.06, by:-6, tilt:-4, lhX:-120, lhY:40, rhX:120, rhY:40, lhR:40, rhR:-40, handL:1, handR:1, tailWag:1.5 },
+  'feel-proud':      { pitch:-4, eyeOpen:.6, mouthCurve:12, browY:-88, squash:1.06, by:-6, tilt:-4, lhX:-120, lhY:40, rhX:120, rhY:40, lhR:40, rhR:-40, handL:1, handR:1, tailWag:1.5 },
   'feel-embarrassed':{ eyeOpen:.6, lookX:-10, lookY:6, browInner:-12, mouthCurve:4, mouthW:14, tilt:-8, squash:.96, lhX:-60, lhY:20, rhX:60, rhY:20, handL:3, handR:3 },
   'feel-laughing':   { eyeOpen:.15, mouthOpen:28, mouthCurve:18, mouthW:42, browY:-92, bounce:12, tilt:-6, lhY:40, rhY:40, tongue:1, tailWag:3 },
   'feel-crying':     { eyeOpen:.2, browInner:-24, mouthOpen:14, mouthCurve:-16, mouthW:26, squash:.94, lhX:-50, lhY:-20, rhX:50, rhY:-20, handL:1, handR:1, earL:-45, earR:45, tailWag:0 },
@@ -245,28 +247,37 @@ const LAYER_KEYS = new Set(Object.keys(BASE));
 const poseParams = name => { const p = { ...POSES[name] }; delete p.layer; return p; };
 
 /* ---------- cast: the fridge in different builds (the video's "who") ---------- */
-const CAST = {
-  doug:      { label:'Doug', bw:1, bh:1 },
-  child:     { label:'Child', bw:.82, bh:.68, eyeScale:1.25 },
-  girl:      { label:'Girl', bw:.86, bh:1.02, eyeScale:1.12, browW:.8 },
-  teen:      { label:'Teen', bw:.78, bh:1.18, eyeScale:1.05 },
-  boss:      { label:'Boss', bw:1.38, bh:.96, browW:1.9, eyeScale:.9 },
-  clerk:     { label:'Clerk', bw:.9, bh:1.1, eyeScale:.82, browW:.7 },
-  oldman:    { label:'Old man', bw:.74, bh:1.36, eyeScale:.85, browW:1.5 },
-  professor: { label:'Professor', bw:.92, bh:1.3, eyeScale:.9, browW:1.3 },
-  bouncer:   { label:'Bouncer', bw:1.62, bh:1.18, eyeScale:.75, browW:2 },
-  dancer:    { label:'Dancer', bw:.7, bh:1.24, eyeScale:1.05 },
+const CAST = {   // after the reference video's cast: all the same fridge, very different builds, angles and faces
+  doug:      { label:'Doug' },
+  child:     { label:'Child', bodyW:1.05, bodyH:.7, bodyD:.55, yaw:24, pitch:16, seam:.58, eyeShape:1, eyeScale:1.35, headSize:1.1, handSize:.85 },
+  girl:      { label:'Girl', bodyW:.74, bodyH:1.12, bodyD:.36, yaw:10, pitch:6, seam:.52, eyeShape:2, eyeScale:1.12, browW:.75 },
+  teen:      { label:'Teen', bodyW:.8, bodyH:1.22, bodyD:.48, yaw:36, pitch:10, lean:7, twist:20, seam:.46, browW:.9 },
+  boss:      { label:'Boss', bodyW:1.38, bodyH:.82, bodyD:1.05, yaw:32, pitch:28, seam:.38, eyeShape:3, eyeScale:.9, browW:2.3, handSize:1.15 },
+  clerk:     { label:'Clerk', bodyW:.86, bodyH:1.04, bodyD:.32, yaw:6, pitch:3, seam:.5, eyeScale:.78, browW:.7, handSize:.9 },
+  oldman:    { label:'Old man', bodyW:.58, bodyH:1.48, bodyD:.4, yaw:30, pitch:6, lean:-11, twist:-6, seam:.4, eyeShape:3, eyeScale:.9, browW:1.6, handSize:.9 },
+  professor: { label:'Professor', bodyW:.88, bodyH:1.36, bodyD:.42, yaw:15, pitch:8, seam:.7, eyeShape:3, eyeScale:.85, browW:1.4 },
+  bouncer:   { label:'Bouncer', bodyW:1.62, bodyH:1.25, bodyD:.95, yaw:20, pitch:14, seam:.42, eyeShape:3, eyeScale:.72, browW:2.2, handSize:1.45 },
+  dancer:    { label:'Dancer', bodyW:.64, bodyH:1.3, bodyD:.34, yaw:26, pitch:5, lean:11, twist:12, seam:.52, eyeShape:2, handSize:.95 },
 };
+const HB_BUILDS = {   // Hashbrown's own builds on the same controls
+  puppy:   { label:'Puppy', bodyW:.88, bodyH:.82, headSize:1.28, eyeShape:1, eyeScale:1.15, handSize:.9 },
+  chonk:   { label:'Chonk', bodyW:1.34, bodyH:.92, headSize:.96, handSize:1.15 },
+  lanky:   { label:'Lanky', bodyW:.82, bodyH:1.2, headSize:.95, lean:-4 },
+  grandpa: { label:'Grandpa', eyeShape:3, browW:1.6, headSize:.95, lean:-5, bodyH:.95 },
+};
+const DESIGN_SCALE = new Set(['bodyW', 'bodyH', 'bodyD', 'eyeScale', 'browW', 'handSize', 'headSize']);
+// a build sets its own baseline; poses and sliders still nudge from there
+const withDesign = (P, d) => { const Q = { ...P }; for (const k in d) if (k in BASE) Q[k] = DESIGN_SCALE.has(k) ? d[k] * (P[k] / (BASE[k] || 1)) : d[k] + (P[k] - BASE[k]); return Q; };
 const CAMERAS = { 1:{ zoom:1, camY:0, shake:0 }, full:{ zoom:1, camY:0, shake:0 }, 2:{ zoom:1.85, camY:105, shake:0 }, close:{ zoom:1.85, camY:105, shake:0 },
   3:{ zoom:1.35, camY:55, shake:0 }, medium:{ zoom:1.35, camY:55, shake:0 }, 4:{ zoom:1.12, camY:15, shake:1 }, handheld:{ zoom:1.12, camY:15, shake:1 } };
-const SET_ALIASES = { 'body.w':['bw', 1], 'body.h':['bh', 1], 'body.d':['bw', 1], 'eyes.size':['eyeScale', 6.3], 'eyes.spacing':['eyeGap', 96], 'eyes.aspect':['eyeOpen', 1.4],
+const SET_ALIASES = { 'body.w':['bodyW', 1], 'body.h':['bodyH', 1], 'body.d':['bodyD', 1], 'view.yaw':['yaw', 1], 'view.pitch':['pitch', 1], 'rest.lean':['lean', 1], 'rest.twist':['twist', 1], 'eyes.shape':['eyeShape', 1], 'eyes.size':['eyeScale', 6.3], 'eyes.spacing':['eyeGap', 96], 'eyes.aspect':['eyeOpen', 1.4],
   'brows.thick':['browW', 18], 'brows.len':['browW', 4], 'mouth.open':['mouthOpen', 30], 'mouth.smile':['mouthCurve', 20] };
 
 const STYLES = {
   pencil:    { bg:'#efede6', ink:'rgba(38,38,44,.82)', w:2.3, jitter:2.4, passes:2, guides:'rgba(70,115,205,.32)', shadow:'rgba(0,0,0,.10)',
-               fills:{ dark:'rgba(38,38,44,.85)', eyeWhite:'#efede6', iris:'rgba(38,38,44,.7)', fur:'BG', white:'BG', pink:'rgba(38,38,44,.12)' } },
+               fills:{ dark:'rgba(38,38,44,.85)', eyeWhite:'#efede6', iris:'rgba(38,38,44,.7)', fur:'BG', white:'BG', pink:'rgba(38,38,44,.12)', body:'BG', side:{ base:'BG', hatch:'rgba(38,38,44,.32)', angle:62, gap:6, lw:1.3 } } },
   blueprint: { bg:'#eef0ef', ink:'rgba(52,128,214,.9)', w:2, jitter:1.8, passes:3, guides:'rgba(52,128,214,.32)', shadow:'rgba(0,0,0,.10)',
-               fills:{ dark:'rgba(52,128,214,.9)', eyeWhite:'#eef0ef', iris:'rgba(52,128,214,.7)', fur:'BG', white:'BG', pink:'rgba(52,128,214,.15)' } },
+               fills:{ dark:'rgba(52,128,214,.9)', eyeWhite:'#eef0ef', iris:'rgba(52,128,214,.7)', fur:'BG', white:'BG', pink:'rgba(52,128,214,.15)', body:'BG', side:{ base:'BG', hatch:'rgba(52,128,214,.35)', angle:62, gap:6, lw:1.2 } } },
   ink:       { bg:'#fbfaf7', ink:'#141414', w:7, jitter:0, passes:1, shadow:'rgba(0,0,0,.16)',
                fills:{ body:'#ffffff', side:'#e9e7e1', dark:'#141414', eyeWhite:'#ffffff', hand:'#ffffff', iris:'#6b3a1a', fur:'#e0843a', white:'#ffffff', pink:'#f48aa0' } },
   hologram:  { bg:'#05060b', ink:'#ff4fd8', w:3, jitter:.5, passes:1, glow:28, holo:true,
@@ -743,18 +754,24 @@ const _pix = document.createElement('canvas'), _layer = document.createElement('
 
 /* ---------- draw the rig ---------- */
 // Shared parts: any character can reuse these, so every pose works on every character.
-function drawEyes(ctx, pen, P, cx, ey, browOffset, pupil = .42, iris = false) {
+function drawEyes(ctx, pen, P, cx, ey, browOffset, pupil = .42, iris = false, lidRole = 'body') {
+  const shape = Math.round(P.eyeShape || 0);   // 0 oval, 1 big round, 2 lashes, 3 heavy lids
   for (const side of [-1, 1]) {
-    const es = P.eyeSize * (P.eyeScale || 1), ex = cx + side * P.eyeGap, rx = es, ry = Math.max(1, es * .62 * P.eyeOpen);
+    const es = P.eyeSize * (P.eyeScale || 1), ex = cx + side * P.eyeGap, rx = es * (shape === 1 ? .92 : 1), ry = Math.max(1, es * (shape === 1 ? .95 : .62) * P.eyeOpen), pu = shape === 1 ? .56 : pupil;
     if (P.eyeOpen < .16) { pen.stroke(quad([ex - rx, ey], [ex, ey + 6], [ex + rx, ey]), false, 1.3); }
     else {
       const eye = ellipse(ex, ey, rx, ry, 32);
       pen.fill(eye, 'eyeWhite'); pen.stroke(eye, true, 1.1);
       ctx.save(); ctx.beginPath(); ctx.ellipse(ex, ey, rx, ry, 0, 0, TAU); ctx.clip();
-      pen.fill(ellipse(ex + P.lookX, ey + P.lookY, rx * pupil, rx * pupil, 20), iris ? 'iris' : 'dark');
-      if (iris) pen.fill(ellipse(ex + P.lookX, ey + P.lookY, rx * pupil * .55, rx * pupil * .55, 18), 'dark');
-      pen.fill(ellipse(ex + P.lookX + rx * pupil * .35, ey + P.lookY - rx * pupil * .35, rx * .12, rx * .12, 10), 'eyeWhite');
+      pen.fill(ellipse(ex + P.lookX, ey + P.lookY, rx * pu, rx * pu, 20), iris ? 'iris' : 'dark');
+      if (iris) pen.fill(ellipse(ex + P.lookX, ey + P.lookY, rx * pu * .55, rx * pu * .55, 18), 'dark');
+      pen.fill(ellipse(ex + P.lookX + rx * pu * .35, ey + P.lookY - rx * pu * .35, rx * .12, rx * .12, 10), 'eyeWhite');
+      if (shape === 1) pen.fill(ellipse(ex + P.lookX - rx * pu * .3, ey + P.lookY + rx * pu * .4, rx * .07, rx * .07, 8), 'eyeWhite');
+      if (shape === 3) pen.fill([[ex - rx * 1.2, ey - ry * 1.4], [ex + rx * 1.2, ey - ry * 1.4], [ex + rx * 1.2, ey - ry * .1], [ex - rx * 1.2, ey - ry * .1]], lidRole);
       ctx.restore();
+      if (shape === 3) pen.stroke([[ex - rx * 1.02, ey - ry * .1], [ex + rx * 1.02, ey - ry * .1]], false, 1.3);
+      if (shape === 2) for (const k of [0, 1, 2]) { const a = -Math.PI / 2 + side * (.5 + k * .34), x0 = ex + Math.cos(a) * rx, y0 = ey + Math.sin(a) * ry;
+        pen.stroke([[x0, y0], [x0 + Math.cos(a) * 9 + side * 3, y0 + Math.sin(a) * 9 - 2]], false, .9); }
     }
     const by = ey + browOffset + (P.browY + 78);
     const inner = ex - side * rx * .6, outer = ex + side * rx * 1.15;
@@ -762,33 +779,66 @@ function drawEyes(ctx, pen, P, cx, ey, browOffset, pupil = .42, iris = false) {
     pen.stroke(quad([inner, iy], [(inner + outer) / 2, Math.min(iy, oy) - 6], [outer, oy]), false, 2.1 * P.browW);
   }
 }
+// a quadrilateral with rounded corners, as a polyline (edges subdivided so the pencil boil has something to wobble)
+function roundQuad(q, r) {
+  const out = [];
+  for (let i = 0; i < 4; i++) {
+    const p0 = q[(i + 3) % 4], p1 = q[i], p2 = q[(i + 1) % 4], d1 = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) || 1, d2 = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) || 1, rr = Math.min(r, d1 * .4, d2 * .4);
+    const a = [p1[0] + (p0[0] - p1[0]) / d1 * rr, p1[1] + (p0[1] - p1[1]) / d1 * rr], b = [p1[0] + (p2[0] - p1[0]) / d2 * rr, p1[1] + (p2[1] - p1[1]) / d2 * rr], e = [p2[0] + (p1[0] - p2[0]) / d2 * rr, p2[1] + (p1[1] - p2[1]) / d2 * rr];
+    out.push(...quad(a, p1, b, 6)); for (let k = 1; k < 5; k++) out.push([b[0] + (e[0] - b[0]) * k / 5, b[1] + (e[1] - b[1]) * k / 5]);
+  }
+  return out;
+}
 // scalloped outline for fur: pushes points outward in soft bumps
 function fluff(pts, amp, bumps) { const n = pts.length, cx = pts.reduce((a, p) => a + p[0], 0) / n, cy = pts.reduce((a, p) => a + p[1], 0) / n;
   return pts.map(([x, y], i) => { const dx = x - cx, dy = y - cy, d = Math.hypot(dx, dy) || 1, k = 1 + amp * Math.abs(Math.sin(i / n * bumps * Math.PI)) / d; return [cx + dx * k, cy + dy * k]; }); }
 const squashAt = (ctx, footY, sq) => { ctx.translate(0, footY); ctx.scale(1 / Math.sqrt(sq), sq); ctx.translate(0, -footY); };
 
 const CHARACTERS = {
-  fridge(ctx, pen, P, S, t, sq) {
-    ctx.save(); squashAt(ctx, 135, sq); ctx.translate(0, 135); ctx.scale(P.bw, P.bh); ctx.translate(0, -135);
-    const back = rrect(-83, -147, 210, 262, 32), front = rrect(-108, -125, 210, 262, 32);
-    pen.fill(back, 'side'); pen.stroke(back, true, .8);
-    pen.fill(front, 'body');
-    if (S.holo) { ctx.save(); ctx.beginPath(); front.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.clip();
-      for (let y = -125; y < 140; y += 16) pen.stroke([[-110, y], [110, y]], false, .25); for (let x = -100; x < 110; x += 24) pen.stroke([[x, -130], [x, 140]], false, .25); ctx.restore(); }
-    pen.stroke(front);
-    pen.stroke([[-76, -125], [-51, -147]], false, .8); pen.stroke([[96, 134], [123, 111]], false, .8);
-    pen.stroke([[-108, 0], [102, 0]], false, .55);     // the "fridge door" seam
-    pen.guide([[0, -175], [0, 175]]); pen.guide([[-140, -40], [140, -40]]); pen.guide(ellipse(0, -10, 150, 170, 48), true);
-    drawEyes(ctx, pen, P, -3, -40, -38);
-    const my = P.mouthY, mw = P.mouthW, up = quad([-mw - 3, my], [-3, my + P.mouthCurve], [mw - 3, my]);
-    if (P.mouthOpen > 1.5) {
-      const lo = quad([-mw - 3, my], [-3, my + P.mouthCurve + P.mouthOpen * 2], [mw - 3, my]);
-      const shape = up.concat(lo.slice().reverse()); pen.fill(shape, 'dark'); pen.stroke(shape, true, 1.1);
-    } else pen.stroke(up, false, 1.3);
+  fridge(ctx, pen, P, S, t, sq) {   // Doug: a real 3D box seen from any angle; his cast are different builds of it
+    const fit = 1 / Math.max(1, P.bodyH * P.bh / 1.25);   // very tall builds step back so they stay in frame
+    ctx.save(); ctx.translate(0, 135); ctx.scale(fit, fit); ctx.translate(0, -135); squashAt(ctx, 135, sq);
+    const W = 105 * P.bodyW * P.bw, Hh = 130 * P.bodyH * P.bh, D = Math.max(8, 105 * P.bodyD), foot = 135, top = foot - 2 * Hh, yc = foot - Hh, rad = Math.PI / 180;
+    const cyw = Math.cos(P.yaw * rad), syw = Math.sin(P.yaw * rad), cp = Math.cos(P.pitch * rad), sp = Math.sin(P.pitch * rad), tl = Math.tan(P.lean * rad);
+    const pr = (x, y, z) => {   // lean (shear), twist (top turns more than the base), then camera turn and tilt
+      const f = (foot - y) / (2 * Hh), a = P.twist * f * rad, ca = Math.cos(a), sa = Math.sin(a); x += tl * (foot - y);
+      const xt = x * ca + z * sa, zt = -x * sa + z * ca, x1 = xt * cyw + zt * syw, z1 = -xt * syw + zt * cyw, dy = y - yc; return [x1, yc + dy * cp + z1 * sp]; };
+    const facing = (nx, ny, nz) => -ny * sp + (-nx * syw + nz * cyw) * cp;   // > 0: that side faces the camera
+    const r = 30 * Math.min(1, W / 105, Hh / 130), xs = [];
+    const faces = [
+      [[[-W, top, -D], [W, top, -D], [W, top, D], [-W, top, D]], [0, -1, 0], 'side'],
+      [[[W, top, -D], [-W, top, -D], [-W, foot, -D], [W, foot, -D]], [0, 0, -1], 'side'],
+      [[[W, top, D], [W, top, -D], [W, foot, -D], [W, foot, D]], [1, 0, 0], 'side'],
+      [[[-W, top, -D], [-W, top, D], [-W, foot, D], [-W, foot, -D]], [-1, 0, 0], 'side'],
+      [[[-W, top, D], [W, top, D], [W, foot, D], [-W, foot, D]], [0, 0, 1], 'body'],
+    ];
+    for (const [cs, n, role] of faces) { if (facing(...n) <= .01) continue; const q2 = cs.map(c => pr(...c)); q2.forEach(([x]) => xs.push(x));
+      const q = roundQuad(q2, r * (role === 'body' ? 1 : .6)); pen.fill(q, role); pen.stroke(q, true, role === 'body' ? 1 : .85); }
+    const sy = top + P.seam * 2 * Hh, front = facing(0, 0, 1) > .01;   // the fridge-door seam runs round the visible sides
+    if (front) pen.stroke([pr(-W, sy, D), pr(W, sy, D)], false, .55);
+    for (const sx of [W, -W]) if (facing(Math.sign(sx), 0, 0) > .01) pen.stroke([pr(sx, sy, D), pr(sx, sy, -D)], false, .55);
+    if (front) {
+      const TL = pr(-W, top, D), TR = pr(W, top, D), BL = pr(-W, foot, D), O = pr(0, sy, D);
+      const ux = [(TR[0] - TL[0]) / (2 * W), (TR[1] - TL[1]) / (2 * W)], uy = [(BL[0] - TL[0]) / (2 * Hh), (BL[1] - TL[1]) / (2 * Hh)];
+      if (S.holo) { ctx.save(); ctx.transform(ux[0], ux[1], uy[0], uy[1], TL[0], TL[1]);   // hologram grid on the front panel
+        for (let y = 0; y < 2 * Hh; y += 16) pen.stroke([[0, y], [2 * W, y]], false, .25); for (let x = 8; x < 2 * W; x += 24) pen.stroke([[x, 0], [x, 2 * Hh]], false, .25); ctx.restore(); }
+      // the face is drawn on the front panel in perspective, sized to fit the lid
+      const k = P.headSize * Math.min(Math.max(.6, Math.min(1.25, W / 105)), (P.seam * 2 * Hh) / 96);
+      ctx.save(); ctx.transform(ux[0] * k, ux[1] * k, uy[0] * k, uy[1] * k, O[0], O[1]);
+      pen.guide([[0, -175], [0, 175]]); pen.guide([[-140, -40], [140, -40]]);
+      drawEyes(ctx, pen, P, -3, -40, -38, .42, false, 'body');
+      const my = P.mouthY, mw = P.mouthW, up = quad([-mw - 3, my], [-3, my + P.mouthCurve], [mw - 3, my]);
+      if (P.mouthOpen > 1.5) {
+        const lo = quad([-mw - 3, my], [-3, my + P.mouthCurve + P.mouthOpen * 2], [mw - 3, my]);
+        const shape = up.concat(lo.slice().reverse()); pen.fill(shape, 'dark'); pen.stroke(shape, true, 1.1);
+      } else pen.stroke(up, false, 1.3);
+      ctx.restore();
+    }
     ctx.restore();
+    const bx0 = Math.min(...xs), bx1 = Math.max(...xs), bcx = (bx0 + bx1) / 2, bhw = (bx1 - bx0) / 2;
     // hands (not squashed with the body). shapes: 0 mitten, 1 fist, 2 point, 3 five, 4 thumbs up, 5 two, 6 three, 7 palm up
     const hand = (x, y, r, flip, wave, shape) => {
-      ctx.save(); ctx.translate(x, y); ctx.rotate((r + wave * Math.sin(t * 13) * 22) * Math.PI / 180); ctx.scale(flip, 1);
+      ctx.save(); ctx.translate(x, y); ctx.rotate((r + wave * Math.sin(t * 13) * 22) * Math.PI / 180); ctx.scale(flip * P.handSize, P.handSize);
       const sh = Math.round(shape || 0), finger = (fx, len, ang = 0) => { ctx.save(); ctx.translate(fx, -14); ctx.rotate(ang * Math.PI / 180); const f = rrect(-6, -len, 12, len + 8, 6); pen.fill(f, 'hand'); pen.stroke(f, true, .85); ctx.restore(); };
       if (sh === 0 || sh === 7) {
         const palm = rrect(-22, -30, 44, 58, 18), thumb = ellipse(-24, 2, 10, 15, 18);
@@ -803,7 +853,10 @@ const CHARACTERS = {
       }
       ctx.restore();
     };
-    hand(P.lhX * P.bw, 135 + (P.lhY - 135) * P.bh, P.lhR, 1, 0, P.handL); hand(P.rhX * P.bw, 135 + (P.rhY - 135) * P.bh, P.rhR, -1, P.wave, P.handR);
+    const hy = y => 135 + (y - 135) * (Hh / 130), hx = x => bcx + x / 160 * (bhw + 52 * P.handSize);   // hands hang off whatever build Doug is
+    ctx.save(); ctx.translate(0, 135); ctx.scale(fit, fit); ctx.translate(0, -135);
+    hand(hx(P.lhX), hy(P.lhY), P.lhR, 1, 0, P.handL); hand(hx(P.rhX), hy(P.rhY), P.rhR, -1, P.wave, P.handR);
+    ctx.restore();
   },
 };
 
@@ -843,10 +896,18 @@ function makeSvgCharacter(rig) {
   const pick = (want, fallbacks) => [want, ...fallbacks].find(id => parts[id]);
   const about = (ctx, pv, fn) => { if (!pv) return fn(); ctx.translate(pv[0], pv[1]); fn(); ctx.translate(-pv[0], -pv[1]); };
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const bbox = pts => pts.reduce((b, [x, y]) => [Math.min(b[0], x), Math.min(b[1], y), Math.max(b[2], x), Math.max(b[3], y)], [1e9, 1e9, -1e9, -1e9]);
+  const eyeBoxes = ((parts['eyes-open'] || {}).paths || []).filter(p => p.role === 'dark').slice(0, 2).map(p => bbox(p.pts));
+  const faceX = parts.head && parts.head.pivot ? parts.head.pivot[0] : cx;
   return function (ctx, pen, P, S, t, sq) {
-    ctx.save(); squashAt(ctx, 190, sq); ctx.translate(0, 190); ctx.scale(s, s); ctx.translate(-cx, -y1);
+    // build & view on a 2D drawing: width/height, lean as a shear, turning squeezes and mirrors past front-on
+    const mir = P.yaw < -5 ? -1 : 1, turn = mir * P.yaw - 18;
+    ctx.save(); squashAt(ctx, 190, sq); ctx.translate(0, 190); ctx.transform(1, 0, -Math.tan(P.lean * Math.PI / 180), 1, 0, 0);
+    const fit = 1 / Math.max(1, P.bodyH, P.headSize * .92);   // tall builds and big heads step back to stay in frame
+    ctx.scale(fit * mir * P.bodyW * (1 - Math.min(.3, Math.abs(turn) / 150)), fit * P.bodyH * (1 - (P.pitch - 8) / 250));
+    ctx.scale(s, s); ctx.translate(-cx, -y1);
     // choose face variants from the continuous rig params
-    const eyes = P.eyeOpen < .3 ? (P.mouthCurve > 6 ? 'eyes-happy' : 'eyes-closed') : P.eyeOpen > 1.15 ? 'eyes-wide' : 'eyes-open';
+    const eyes = P.eyeOpen < .3 ? (P.mouthCurve > 6 ? 'eyes-happy' : 'eyes-closed') : P.eyeOpen > 1.15 || Math.round(P.eyeShape) === 1 ? 'eyes-wide' : 'eyes-open';
     const brows = P.browInner > 8 ? 'brows-angry' : P.browInner < -8 ? 'brows-worried' : 'brows-neutral';
     const open = P.mouthOpen > 3 || P.tongue > .5;
     const mouth = open ? (P.mouthW < 22 && P.mouthOpen > 3 ? 'mouth-o' : 'mouth-grin') : P.mouthCurve > 4 ? 'mouth-smile' : P.mouthCurve < -4 ? 'mouth-frown' : 'mouth-flat';
@@ -858,11 +919,13 @@ function makeSvgCharacter(rig) {
       const part = parts[id], pv = part.pivot; ctx.save();
       if (headSet.has(id)) {          // everything on the head moves with it: bob + a tilt when quizzical
         ctx.translate(0, Math.sin(t * 2.2 + 1) * 4);
-        about(ctx, head, () => ctx.rotate(P.browTilt * .9 * Math.PI / 180));
+        about(ctx, head, () => { ctx.rotate(P.browTilt * .9 * Math.PI / 180); ctx.scale(P.headSize, P.headSize); });
+        if (isFace(id) || id === 'nose') ctx.translate(turn * .7, 0);   // the face slides toward where he's turning
       }
       if (id === 'tail') about(ctx, pv, () => ctx.rotate(Math.sin(t * 15) * 18 * P.tailWag * Math.PI / 180));
       if (id === 'ear-left') about(ctx, pv, () => ctx.rotate(P.earL * .8 * Math.PI / 180));
       if (id === 'ear-right') about(ctx, pv, () => ctx.rotate(P.earR * .8 * Math.PI / 180));
+      if (id.startsWith('leg-front')) about(ctx, pv, () => ctx.scale(P.handSize, P.handSize));
       if (id === 'leg-front-left') about(ctx, pv, () => ctx.rotate(legUp(P.lhY, P.lhR) * Math.PI / 180));
       if (id === 'leg-front-right') about(ctx, pv, () => ctx.rotate(-(legUp(P.rhY, -P.rhR) + P.wave * Math.sin(t * 13) * 16) * Math.PI / 180));
       if (id.startsWith('eyes-')) { ctx.translate(P.lookX * .9, P.lookY * .9);
@@ -870,6 +933,11 @@ function makeSvgCharacter(rig) {
       if (id.startsWith('brows-')) ctx.translate(P.lookX * .4, (P.browY + 78) * 1.1);
       if (id.startsWith('mouth-')) about(ctx, pv && [pv[0], pv[1] - 22], () => ctx.scale(clamp(P.mouthW / 30, .6, 1.4), open ? clamp(.45 + P.mouthOpen / 18, .5, 1.25) : 1));
       for (const p of part.paths) { if (p.role) pen.fill(p.pts, p.role); pen.stroke(p.pts, p.closed, (p.role ? 1 : .7) / s * .62); }
+      if (id === 'eyes-open') { const sh = Math.round(P.eyeShape || 0);   // lashes / heavy lids drawn over his own eyes
+        for (const [bx0, by0, bx1, by1] of eyeBoxes) { const ex = (bx0 + bx1) / 2, eyy = (by0 + by1) / 2, rx = (bx1 - bx0) / 2, ry = (by1 - by0) / 2, side = ex < faceX ? -1 : 1;
+          if (sh === 3) { pen.fill([[bx0 - 7, by0 - 10], [bx1 + 7, by0 - 10], [bx1 + 7, eyy - ry * .1], [bx0 - 7, eyy - ry * .1]], 'fur'); pen.stroke([[bx0 - 5, eyy - ry * .1], [bx1 + 5, eyy - ry * .1]], false, 1.2 / s * .62); }
+          if (sh === 2) for (const k of [0, 1, 2]) { const a = -Math.PI / 2 + side * (.5 + k * .35), x0 = ex + Math.cos(a) * rx, y0 = eyy + Math.sin(a) * ry; pen.stroke([[x0, y0], [x0 + Math.cos(a) * 13, y0 + Math.sin(a) * 13 - 3]], false, .9 / s * .62); }
+        } }
       ctx.restore();
     }
     ctx.restore();
@@ -1007,8 +1075,8 @@ path { stroke: #161514; stroke-width: 6; stroke-linecap: round; stroke-linejoin:
 </g>
 </svg>`;
 CHARACTERS.hashbrown = makeSvgCharacter(parseSvgRig(HASHBROWN_SVG));
-for (const [id, c] of Object.entries(CAST)) if (id !== 'doug')
-  CHARACTERS[id] = (ctx, pen, P, S, t, sq) => CHARACTERS.fridge(ctx, pen, { ...P, bw: P.bw * c.bw, bh: P.bh * c.bh, eyeScale: (P.eyeScale || 1) * (c.eyeScale || 1), browW: P.browW * (c.browW || 1) }, S, t, sq);
+for (const [id, c] of Object.entries(CAST)) if (id !== 'doug') CHARACTERS[id] = (ctx, pen, P, S, t, sq) => CHARACTERS.fridge(ctx, pen, withDesign(P, c), S, t, sq);
+for (const [id, c] of Object.entries(HB_BUILDS)) CHARACTERS['hashbrown-' + id] = (ctx, pen, P, S, t, sq) => CHARACTERS.hashbrown(ctx, pen, withDesign(P, c), S, t, sq);
 
 function drawCharacter(ctx, P, S, t, who = 'fridge') {
   const W = ctx.canvas.width, H = ctx.canvas.height, k = W / 1920;
@@ -1691,9 +1759,13 @@ const SLIDERS = {
   Mouth: [['mouthW','Width', 8, 50, .5], ['mouthCurve','Smile', -20, 20, .5], ['mouthOpen','Open', 0, 30, .5]],
   'Arms / paws': [['lhY','Left height', -80, 130, 1], ['rhY','Right height', -80, 130, 1], ['wave','Wave', 0, 1.5, .05]],
   'Ears & tail': [['earL','Left ear', -50, 30, .5], ['earR','Right ear', -30, 50, .5], ['tailWag','Tail wag', 0, 3, .05], ['tongue','Tongue', 0, 1, .01]],
+  Build: [['bodyW','Width', .5, 1.8, .01], ['bodyH','Height', .5, 1.6, .01], ['bodyD','Depth (Doug)', .15, 1.2, .01], ['seam','Door seam (Doug)', .2, .8, .01], ['headSize','Head / face size', .7, 1.5, .01], ['handSize','Hand / paw size', .6, 1.6, .01]],
+  'View & posture': [['yaw','Turn', -40, 60, .5], ['pitch','Seen from above', -10, 35, .5], ['lean','Lean', -15, 15, .5], ['twist','Twist (Doug)', -30, 30, .5]],
+  'Eye style': [['eyeShape','Oval · round · lashes · heavy', 0, 3, 1]],
 };
 const LABELS = { fridge:'Doug (fridge)', hashbrown:'Hashbrown' };
 for (const [id, c] of Object.entries(CAST)) if (id !== 'doug') LABELS[id] = c.label;
+for (const [id, c] of Object.entries(HB_BUILDS)) LABELS['hashbrown-' + id] = c.label;
 const cap = s => s[0].toUpperCase() + s.slice(1);
 
 /* ----- script ----- */
@@ -1795,8 +1867,8 @@ function tiles(items) {   // tiles grouped under category headings, like the ref
 let tabItems = [];
 function buildTab() {
   document.querySelectorAll('[role=tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === tab));
-  if (tab === 'character') { const ids = Object.keys(CHARACTERS), cast = id => !!CAST[id];
-    tabItems = [...ids.filter(id => !cast(id)), ...ids.filter(cast)].map(c => ({ cat: cast(c) ? "Doug's cast" : 'Characters', label: LABELS[c] || cap(c), change: { character: c } })); }
+  if (tab === 'character') { const ids = Object.keys(CHARACTERS), grp = id => CAST[id] ? 1 : id.startsWith('hashbrown-') ? 2 : 0, cats = ['Characters', "Doug's cast", "Hashbrown's builds"];
+    tabItems = [0, 1, 2].flatMap(g => ids.filter(id => grp(id) === g)).map(c => ({ cat: cats[grp(c)], label: LABELS[c] || cap(c), change: { character: c } })); }
   if (tab === 'style') tabItems = STYLE_SWATCHES.map(q => ({ cat: q.cat, label: q.label, change: { style: q.style, ...(q.color ? { color: q.color } : {}), ...(q.color2 ? { color2: q.color2 } : {}) } }));
   if (tab === 'pose') tabItems = POSE_CATS.flatMap(([cat, list]) => list.filter(q => POSES[q]).map(q => ({ cat, label: cap((q.startsWith('feel-') ? q.slice(5) : q).replace(/-/g, ' ')), change: { pose: q } })));
   if (tab === 'design') {

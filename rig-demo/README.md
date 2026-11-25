@@ -9,11 +9,26 @@ A code-driven character animation engine: **every frame is a pure function of `(
   - **Styles:** 118 styles in 13 categories: House, Drawn, Print and paste, Comics, Spooky, 1980s and 1990s, Cartoon, Pixels, Screens and light, Glitch: signal, Glitch: time, Hologram (8 palettes), and Originals.
   - **Poses:** 64 poses in 6 groups: classic, 14 attitudes, 12 feelings, and eye, mouth and hand poses. Eye, mouth and hand poses (`eyes-suspicious`, `mouth-gasp`, `count3`, `thumbsup`…) layer on top of the current body pose.
   - **Script commands:**
-    - `who` / `preset` picks a cast member, Doug's builds: child, girl, teen, boss, clerk, old man, professor, bouncer, dancer.
+    - `who` / `preset` picks a cast member. Doug's cast: child, girl, teen, boss, clerk, old man, professor, bouncer, dancer. Hashbrown's builds: `hashbrown-puppy`, `-chonk`, `-lanky`, `-grandpa`.
     - `camera` picks a shot: 1 full, 2 close, 3 medium, 4 handheld.
     - `grid: 3|5|7` shows the same moment in many styles at once.
     - `set: 'body.w', to: 1.05` sets a value by name.
     - `palette` picks a hologram colour.
+- **Doug is a 3D box.** Every build and pose is drawn from these controls:
+  - width, height and depth
+  - door-seam height
+  - camera turn (`yaw`) and how far it's seen from above (`pitch`)
+  - lean and twist
+  - eye style: oval, round, lashes or heavy-lidded
+  - head and hand size
+
+  The face sits on the front panel in perspective. Cast members are builds of him, modelled on the reference video. Hashbrown maps the same controls onto his 2D drawing:
+  - build and lean
+  - turn, which squeezes the drawing and mirrors it past front-on
+  - head and paw size
+  - all four eye styles
+
+  The controls are in the Design tab, under Build, View & posture and Eye style.
 - **Characters**: `fridge` and `hashbrown` (a red-and-white Pembroke, modelled on his owner's ink drawing; standing 3/4 view). They read the same params, so every pose and style works on both. Switch with `{ at: [10, 1], character: 'hashbrown' }`. Characters can also use extra channels (Hashbrown uses `earL`, `earR`, `tailWag` and `tongue`), which other characters ignore.
 - **Score**: events in musical time, `{ at: [bar, beat], pose | style | set | talk }`, compiled to keyframes with an overshoot ease, plus always-on secondary motion (breathing, blinking, 12fps line "boil", lip flap).
 
