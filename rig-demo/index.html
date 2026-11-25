@@ -1865,7 +1865,9 @@ function parseSvgRoom(text) {
         let role = cls || null;
         if (!role && tag !== 'line' && tag !== 'polyline') { const fc = getComputedStyle(el).fill, mm = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/.exec(fc || '');
           const black = mm && +mm[1] + +mm[2] + +mm[3] === 0, said = el.closest('[fill], [style*="fill"]') || cssFill;   // SVG fills black by default: only count black if it was asked for
-          if (mm && (mm[4] == null || +mm[4] > .05) && (!black || said)) { const l = (+mm[1] * .3 + +mm[2] * .59 + +mm[3] * .11) / 255; role = l < .25 ? 'dark' : l < .62 ? 'side' : 'white'; } }
+          if (mm && (mm[4] == null || +mm[4] > .05) && (!black || said)) { const r = +mm[1] / 255, g = +mm[2] / 255, b = +mm[3] / 255, l = r * .3 + g * .59 + b * .11, hi = Math.max(r, g, b), lo = Math.min(r, g, b), sat = hi ? (hi - lo) / hi : 0;
+            // colourful shapes become the style's accent colours (warm → fur, otherwise pink); the rest go by lightness
+            role = l < .2 ? 'dark' : sat > .35 ? (r >= b && g >= b * .9 && r > g * .9 ? 'fur' : 'pink') : l < .62 ? 'side' : 'white'; } }
         const closed = !!role || (tag !== 'line' && tag !== 'polyline' && (tag !== 'path' || /z\s*$/i.test(el.getAttribute('d') || '')));
         shapes.push({ pts, closed, role });
       });
