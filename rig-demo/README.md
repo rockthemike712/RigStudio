@@ -30,12 +30,18 @@ A code-driven character animation engine: **every frame is a pure function of `(
 
   The controls are in the Design tab, under Build, View & posture and Eye style.
 - **Characters**: `fridge` and `hashbrown` (a red-and-white Pembroke, modelled on his owner's ink drawing; standing 3/4 view). They read the same params, so every pose and style works on both. Switch with `{ at: [10, 1], character: 'hashbrown' }`. Characters can also use extra channels (Hashbrown uses `earL`, `earR`, `tailWag` and `tongue`), which other characters ignore.
+- **Rooms and the 2.5D camera.** A `room` track changes on its own, like style: `{ at: [9, 1], room: 'kitchen' }`.
+  - Rooms: `kitchen`, `living`, `stage`, `street`, `park`, `space`, and `none` (the style's own background).
+  - Each room is a paper diorama: floor and walls in real perspective, 3D boxes for furniture and buildings, and flat cut-outs standing at different depths. It's drawn with the style's own pen, so every room works in every style. Room surfaces use each style's flat colours rather than its full texture (crayon scribble over a whole wall costs ~100 ms a frame), and far layers are veiled so the character stays in front.
+  - Camera moves: `move: 'push' | 'pull' | 'pan' | 'orbit' | 'drift' | 'sweep' | 'still'` (or `camera: 'orbit'`). A move runs over two bars and eases in from the last one. Near layers slide further than far ones, boxes show their sides, and orbiting turns Doug for real (Hashbrown, a flat drawing, turns a little). Push-ins on top of close-ups are capped so the camera never ends up inside the character.
+  - The camera is also three rig values, `dolly`, `pan` and `orbit` (Design tab → Camera), so `set` works on them too.
+  - Room tab: tap a room or a move to preview it, then Add. Auto-animate gives the star a home room (kitchen for Doug's family, living room for Hashbrown's), moves somewhere else for big sections, and picks a shot and a move per section. Untick "Rooms" to keep the style backgrounds.
 - **Score**: events in musical time, `{ at: [bar, beat], pose | style | set | talk }`, compiled to keyframes with an overshoot ease, plus always-on secondary motion (breathing, blinking, 12fps line "boil", lip flap).
 
 ## Run it
 Open `rig-demo/index.html` in a browser. It has three parts:
 - **Stage** (middle): the character, animating.
-- **Control deck** (right): Character, Style and Pose tabs with live thumbnails, plus a Design tab of sliders for every rig parameter.
+- **Control deck** (right): Character, Style, Pose and Room tabs with live thumbnails, plus a Design tab of sliders for every rig parameter.
   - **Paused:** clicks and slider moves are previews. Press "Add at bar X, beat Y" to write the preview into the script.
   - **Playing:** every click is recorded into the script on the nearest half-beat, so you can perform along to a song ("Load song").
 - **Script** (left): the source of truth. It's editable, changes apply live, and the line currently playing is highlighted.
@@ -85,6 +91,7 @@ This steps time frame by frame in headless Chromium and pipes the frames to ffmp
 
 ## Extending
 - New expression: add an entry to `POSES`.
+- New room: add a function to `ROOMS` and list it in `ROOM_LIST`. It gets a helper `R` with `walls`, `plane`, `tint`, `line`, `rect`, `box` (real 3D, back faces culled) and `card` (a cut-out at a depth). Units match the character; `y` is up from the floor (negative), `z` is depth away from the camera.
 - New look: add an entry to `STYLES`. A style sets:
   - lines: colour, weight, jitter, passes, glow
   - fills per role: flat colour, `grad`, `hatch`, `dots`, `scribble`, `stripes`, `spray`, `foil`, `rainbow` or `noise`
