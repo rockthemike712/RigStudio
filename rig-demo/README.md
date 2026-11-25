@@ -9,18 +9,39 @@ A code-driven character animation engine: **every frame is a pure function of `(
   - **Styles:** 118 styles in 13 categories: House, Drawn, Print and paste, Comics, Spooky, 1980s and 1990s, Cartoon, Pixels, Screens and light, Glitch: signal, Glitch: time, Hologram (8 palettes), and Originals.
   - **Poses:** 64 poses in 6 groups: classic, 14 attitudes, 12 feelings, and eye, mouth and hand poses. Eye, mouth and hand poses (`eyes-suspicious`, `mouth-gasp`, `count3`, `thumbsup`…) layer on top of the current body pose.
   - **Script commands:**
-    - `who` / `preset` picks a cast member, Doug's builds: child, girl, teen, boss, clerk, old man, professor, bouncer, dancer.
+    - `who` / `preset` picks a cast member. Doug's cast: child, girl, teen, boss, clerk, old man, professor, bouncer, dancer. Hashbrown's builds: `hashbrown-puppy`, `-chonk`, `-lanky`, `-grandpa`.
     - `camera` picks a shot: 1 full, 2 close, 3 medium, 4 handheld.
     - `grid: 3|5|7` shows the same moment in many styles at once.
     - `set: 'body.w', to: 1.05` sets a value by name.
     - `palette` picks a hologram colour.
+- **Doug is a 3D box.** Every build and pose is drawn from these controls:
+  - width, height and depth
+  - door-seam height
+  - camera turn (`yaw`) and how far it's seen from above (`pitch`)
+  - lean and twist
+  - eye style: oval, round, lashes or heavy-lidded
+  - head and hand size
+
+  The face sits on the front panel in perspective. Cast members are builds of him, modelled on the reference video. Hashbrown maps the same controls onto his 2D drawing:
+  - build and lean
+  - turn, which squeezes the drawing and mirrors it past front-on
+  - head and paw size
+  - all four eye styles
+
+  The controls are in the Design tab, under Build, View & posture and Eye style.
 - **Characters**: `fridge` and `hashbrown` (a red-and-white Pembroke, modelled on his owner's ink drawing; standing 3/4 view). They read the same params, so every pose and style works on both. Switch with `{ at: [10, 1], character: 'hashbrown' }`. Characters can also use extra channels (Hashbrown uses `earL`, `earR`, `tailWag` and `tongue`), which other characters ignore.
+- **Rooms and the 2.5D camera.** A `room` track changes on its own, like style: `{ at: [9, 1], room: 'kitchen' }`.
+  - Rooms: `kitchen`, `living`, `stage`, `street`, `park`, `space`, and `none` (the style's own background).
+  - Each room is a paper diorama: floor and walls in real perspective, 3D boxes for furniture and buildings, and flat cut-outs standing at different depths. It's drawn with the style's own pen, so every room works in every style. Room surfaces use each style's flat colours rather than its full texture (crayon scribble over a whole wall costs ~100 ms a frame), and far layers are veiled so the character stays in front.
+  - Camera moves: `move: 'push' | 'pull' | 'pan' | 'orbit' | 'drift' | 'sweep' | 'still'` (or `camera: 'orbit'`). A move runs over two bars and eases in from the last one. Near layers slide further than far ones, boxes show their sides, and orbiting turns Doug for real (Hashbrown, a flat drawing, turns a little). Push-ins on top of close-ups are capped so the camera never ends up inside the character.
+  - The camera is also three rig values, `dolly`, `pan` and `orbit` (Design tab → Camera), so `set` works on them too.
+  - Room tab: tap a room or a move to preview it, then Add. Auto-animate gives the star a home room (kitchen for Doug's family, living room for Hashbrown's), moves somewhere else for big sections, and picks a shot and a move per section. Untick "Rooms" to keep the style backgrounds.
 - **Score**: events in musical time, `{ at: [bar, beat], pose | style | set | talk }`, compiled to keyframes with an overshoot ease, plus always-on secondary motion (breathing, blinking, 12fps line "boil", lip flap).
 
 ## Run it
 Open `rig-demo/index.html` in a browser. It has three parts:
 - **Stage** (middle): the character, animating.
-- **Control deck** (right): Character, Style and Pose tabs with live thumbnails, plus a Design tab of sliders for every rig parameter.
+- **Control deck** (right): Character, Style, Pose and Room tabs with live thumbnails, plus a Design tab of sliders for every rig parameter.
   - **Paused:** clicks and slider moves are previews. Press "Add at bar X, beat Y" to write the preview into the script.
   - **Playing:** every click is recorded into the script on the nearest half-beat, so you can perform along to a song ("Load song").
 - **Script** (left): the source of truth. It's editable, changes apply live, and the line currently playing is highlighted.
@@ -35,7 +56,18 @@ With "Listening: on", the character reacts to the song:
 - the body squashes, bounces and flicks its ears on every beat
 - the tail wags with the song's energy, and the body sways on the beat
 
-"✨ Auto-animate" writes a whole script from the song's structure. It picks calmer styles and poses for quiet sections and glitch styles for big ones, changing on 4-bar boundaries.
+**One character per song (default).** With "One character for the whole song" ticked (Character tab), tapping a character makes it the star of the whole song, and character switches in any script are ignored. Untick it for multi-character videos, where the script's `who` / `character` switches apply.
+
+Loading a song **animates it automatically**: no script needed, just press Play. Auto-animate reads the song's sections, loudness and where the vocals are:
+- vocals get talk-to-camera poses and medium or close shots
+- instrumentals get dancing poses and wide shots
+- big sections get handheld shots and wilder styles
+
+Options next to the button:
+- **Styles:** follow the song, keep current, calm or wild.
+- **Camera moves:** on or off.
+
+Each press of ✨ is a new take. A script you've written yourself is never replaced on load.
 
 **Lip sync** uses a small singing detector trained on real songs; see `lipsync-training/`. For every 20 ms of audio it looks at:
 - tone colour (MFCCs)
@@ -59,6 +91,7 @@ This steps time frame by frame in headless Chromium and pipes the frames to ffmp
 
 ## Extending
 - New expression: add an entry to `POSES`.
+- New room: add a function to `ROOMS` and list it in `ROOM_LIST`. It gets a helper `R` with `walls`, `plane`, `tint`, `line`, `rect`, `box` (real 3D, back faces culled) and `card` (a cut-out at a depth). Units match the character; `y` is up from the floor (negative), `z` is depth away from the camera.
 - New look: add an entry to `STYLES`. A style sets:
   - lines: colour, weight, jitter, passes, glow
   - fills per role: flat colour, `grad`, `hatch`, `dots`, `scribble`, `stripes`, `spray`, `foil`, `rainbow` or `noise`
